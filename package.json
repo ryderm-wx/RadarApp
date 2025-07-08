@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "nexrad-level-3-data": "^0.6.1"
+  }
+}
