@@ -8,92 +8,972 @@
       href="https://cdn.jsdelivr.net/npm/maplibre-gl@3.6.2/dist/maplibre-gl.css"
       rel="stylesheet"
     />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
     <style>
-      /* Base styles with modern typography and color scheme */
       :root {
-        --primary-color: #1a73e8;
-        --danger-color: #f44336;
-        --success-color: #4caf50;
-        --warning-color: #ff9800;
-        --text-primary: #202124;
-        --text-secondary: #5f6368;
-        --surface-light: #ffffff;
-        --surface-dark: #121212;
-        --glass-bg: rgba(20, 20, 28, 0.75);
-        --glass-border: rgba(255, 255, 255, 0.08);
-        --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        --bg: #05070d;
+        --bg-soft: rgba(9, 12, 20, 0.92);
+        --surface: rgba(10, 13, 20, 0.95);
+        --surface-muted: rgba(13, 16, 26, 0.85);
+        --border: rgba(255, 255, 255, 0.06);
+        --border-strong: rgba(255, 255, 255, 0.18);
+        --card-shadow: 0 20px 45px rgba(3, 6, 14, 0.55);
+        --text: #f7f9ff;
+        --muted: #98a1b8;
+        --accent: #4fb8ff;
+        --accent-strong: #2f8eff;
+        --accent-soft: rgba(79, 184, 255, 0.14);
+        --card-radius: 18px;
+        --sidebar-width: 360px;
+        --spacing: 22px;
+      }
+
+      * {
+        box-sizing: border-box;
       }
 
       body {
         margin: 0;
         padding: 0;
-        font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
-          Roboto, Oxygen, Ubuntu, sans-serif;
-        color: var(--text-primary);
+        font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
+        color: var(--text);
+        background: radial-gradient(circle at 15% 0%, #0b1223, #03050a 65%)
+            fixed,
+          #03050a;
+        min-height: 100vh;
+        line-height: 1.6;
         overflow: hidden;
-        background-color: #f5f5f7;
-        line-height: 1.5;
+        position: relative;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image: radial-gradient(
+            circle at 18% 18%,
+            rgba(79, 184, 255, 0.12),
+            transparent 45%
+          ),
+          radial-gradient(
+            circle at 75% -5%,
+            rgba(77, 106, 255, 0.08),
+            transparent 55%
+          );
+        pointer-events: none;
+        z-index: -1;
       }
 
       #map {
         position: absolute;
-        top: 0;
-        bottom: 0;
-        width: 100%;
+        inset: 0 0 0 var(--sidebar-width);
         transition: filter 0.3s ease;
       }
 
-      /* Modern Control Panel with Glass Morphism */
-      .control-panel {
-        position: absolute;
-        top: 20px;
-        right: 20px;
-        background: var(--glass-bg);
-        backdrop-filter: blur(12px) saturate(180%);
-        -webkit-backdrop-filter: blur(12px) saturate(180%);
-        padding: 18px;
-        border-radius: 16px;
-        box-shadow: var(--glass-shadow);
+      .sidebar {
+        position: fixed;
+        inset: 0 auto 0 0;
+        width: var(--sidebar-width);
+        background: linear-gradient(
+          180deg,
+          rgba(6, 9, 15, 0.95),
+          rgba(4, 6, 11, 0.98)
+        );
+        border-right: 1px solid var(--border);
+        box-shadow: var(--card-shadow);
+        display: flex;
+        flex-direction: column;
+        backdrop-filter: blur(18px);
+        padding: 0 0 24px;
         z-index: 1000;
-        max-width: 320px;
-        color: white;
-        border: 1px solid var(--glass-border);
-        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
       }
 
-      .control-panel:hover {
-        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+      .sidebar-hero,
+      .utility-card,
+      .control-section,
+      .timeline-block,
+      .status-card,
+      .loop-controls,
+      .radar-info {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--card-radius);
+        box-shadow: var(--card-shadow);
+      }
+
+      .sidebar-hero {
+        padding: 24px;
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        align-items: stretch;
+      }
+
+      .sidebar-hero::after {
+        content: "";
+        position: absolute;
+        inset: -35% auto auto -10%;
+        width: 240px;
+        height: 240px;
+        background: radial-gradient(
+          circle,
+          rgba(79, 184, 255, 0.12),
+          transparent 70%
+        );
+        opacity: 0.4;
+        pointer-events: none;
+      }
+
+      .hero-text {
+        position: relative;
+        z-index: 2;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .hero-kicker {
+        text-transform: uppercase;
+        letter-spacing: 0.25em;
+        font-size: 0.7rem;
+        color: rgba(255, 255, 255, 0.65);
+        margin: 0;
+      }
+
+      .hero-text h2 {
+        margin: 0;
+        font-size: 1.4rem;
+        letter-spacing: 0.04em;
+      }
+
+      .hero-text p {
+        margin: 0;
+        color: rgba(255, 255, 255, 0.78);
+        font-size: 0.95rem;
+      }
+
+      .hero-pills {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 6px;
+      }
+
+      .hero-pill {
+        padding: 6px 14px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: var(--accent-soft);
+        font-size: 0.78rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text);
+      }
+
+      .hero-pill--outline {
+        background: transparent;
+        border-color: var(--border-strong);
+        color: rgba(255, 255, 255, 0.75);
+      }
+
+      .hero-metrics {
+        border-radius: calc(var(--card-radius) - 4px);
+        border: 1px solid var(--border);
+        background: var(--surface-muted);
+        padding: 18px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+        gap: 12px;
+        position: relative;
+        z-index: 2;
+      }
+
+      .hero-metric__label {
+        font-size: 0.75rem;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.6);
+      }
+
+      .hero-metric__value {
+        font-size: 1.35rem;
+        font-weight: 600;
+        margin: 6px 0 2px;
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+      }
+
+      .hero-metric__subtext {
+        font-size: 0.78rem;
+        color: rgba(255, 255, 255, 0.55);
+      }
+
+      .status-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 12px;
+      }
+
+      .status-card {
+        padding: 16px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .status-card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          135deg,
+          rgba(79, 184, 255, 0.18),
+          transparent
+        );
+        opacity: 0.35;
+        pointer-events: none;
+      }
+
+      .status-card__label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: rgba(255, 255, 255, 0.6);
+        margin-bottom: 6px;
+      }
+
+      .status-card__value {
+        font-size: 1.1rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text);
+      }
+
+      .status-card__meta {
+        font-size: 0.78rem;
+        color: rgba(255, 255, 255, 0.55);
+        margin-top: 4px;
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-flex;
+      }
+
+      .status-dot--online {
+        background: #4ade80;
+        box-shadow: 0 0 12px rgba(74, 222, 128, 0.7);
+      }
+
+      .utility-card {
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .utility-card__title {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+
+      .utility-card__meta {
+        font-size: 0.8rem;
+        color: rgba(255, 255, 255, 0.6);
+      }
+
+      .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 14px;
+      }
+
+      .section-label {
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        font-size: 0.7rem;
+        color: var(--muted);
+        margin: 0 0 4px;
+      }
+
+      .section-header h3 {
+        margin: 0;
+        font-size: 0.95rem;
+        letter-spacing: 0.05em;
+        color: var(--text);
+      }
+
+      .section-icon {
+        font-size: 1.3rem;
+        padding: 10px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .pill-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+
+      .pill {
+        padding: 4px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        font-size: 0.75rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.75);
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      .timeline-block {
+        margin-top: 6px;
+        padding: 18px;
+      }
+
+      .timeline-step {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        padding: 10px 0;
+      }
+
+      .timeline-step + .timeline-step {
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      .timeline-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--accent);
+        box-shadow: 0 0 10px rgba(99, 211, 255, 0.6);
+        flex-shrink: 0;
+        margin-top: 6px;
+      }
+
+      .timeline-content {
+        flex: 1;
+      }
+
+      .timeline-label {
+        font-size: 0.85rem;
+        color: var(--text);
+        margin: 0;
+      }
+
+      .timeline-meta {
+        font-size: 0.75rem;
+        color: rgba(255, 255, 255, 0.6);
+        margin-top: 2px;
+      }
+
+      .sidebar-header {
+        padding: 28px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .sidebar-header h1 {
+        margin: 0;
+        font-weight: 600;
+        font-size: 1.15rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--text);
+      }
+
+      .sidebar-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 24px 28px;
+        display: flex;
+        flex-direction: column;
+        gap: var(--spacing);
+        scroll-behavior: smooth;
+        scrollbar-width: thin;
+        scrollbar-color: var(--accent) transparent;
+      }
+
+      .sidebar-content::-webkit-scrollbar {
+        width: 6px;
+      }
+
+      .sidebar-content::-webkit-scrollbar-thumb {
+        background: var(--accent-soft);
+        border-radius: 999px;
+      }
+
+      .control-section {
+        padding: 20px;
+      }
+
+      .control-section h3 {
+        margin: 0 0 14px;
+        font-size: 0.85rem;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .control-group {
+        margin-bottom: 18px;
+      }
+
+      .control-group:last-child {
+        margin-bottom: 0;
+      }
+
+      .control-group label {
+        display: block;
+        font-size: 0.85rem;
+        color: var(--muted);
+        margin-bottom: 6px;
+      }
+
+      select,
+      input[type="number"] {
+        width: 100%;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: linear-gradient(
+            135deg,
+            rgba(255, 255, 255, 0.04),
+            rgba(255, 255, 255, 0.015)
+          ),
+          rgba(3, 6, 14, 0.65);
+        color: var(--text);
+        padding: 12px 16px;
+        font-size: 0.95rem;
+        transition: border 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+        backdrop-filter: blur(6px);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      }
+
+      select {
+        appearance: none;
+        cursor: pointer;
+        background-image: linear-gradient(
+            135deg,
+            rgba(99, 211, 255, 0.15),
+            rgba(99, 211, 255, 0)
+          ),
+          url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%23FFFFFF' stroke-width='1.2' stroke-linecap='round'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 14px center, right 16px center;
+        padding-right: 46px;
+      }
+
+      select::-ms-expand {
+        display: none;
+      }
+
+      select:focus,
+      input[type="number"]:focus {
+        border-color: rgba(99, 211, 255, 0.8);
+        box-shadow: 0 0 22px rgba(99, 211, 255, 0.25);
+        outline: none;
+        transform: translateY(-1px);
+      }
+
+      input[type="range"] {
+        width: 100%;
+        appearance: none;
+        height: 8px;
+        border-radius: 999px;
+        background: linear-gradient(
+          90deg,
+          rgba(63, 137, 255, 0.25),
+          rgba(31, 177, 255, 0.5)
+        );
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        position: relative;
+      }
+
+      input[type="range"]::-webkit-slider-runnable-track {
+        height: 8px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      input[type="range"]::-moz-range-track {
+        height: 8px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      input[type="range"]::-webkit-slider-thumb {
+        appearance: none;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: radial-gradient(circle, #fff, var(--accent));
+        border: 2px solid rgba(5, 8, 18, 0.9);
+        box-shadow: 0 8px 18px rgba(0, 0, 0, 0.5);
+        margin-top: -6px;
+      }
+
+      input[type="range"]::-moz-range-thumb {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: radial-gradient(circle, #fff, var(--accent));
+        border: 2px solid rgba(5, 8, 18, 0.9);
+        box-shadow: 0 8px 18px rgba(0, 0, 0, 0.5);
+      }
+
+      input[type="range"]:focus-visible {
+        outline: none;
+        box-shadow: 0 0 20px rgba(99, 211, 255, 0.35);
+      }
+
+      .slider-value {
+        min-width: 52px;
+        text-align: right;
+        font-weight: 600;
+      }
+
+      button {
+        background: linear-gradient(120deg, var(--accent-strong), #3f89ff);
+        border: none;
+        border-radius: 14px;
+        padding: 11px 16px;
+        color: #04121f;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 12px 26px rgba(31, 57, 120, 0.4);
+      }
+
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .button-group {
+        display: flex;
+        gap: 10px;
+      }
+
+      .button-ghost {
+        background: transparent;
+        border: 1px solid var(--border-strong);
+        color: var(--text);
+      }
+
+      .button-ghost:hover {
+        background: rgba(255, 255, 255, 0.04);
+        box-shadow: none;
+      }
+
+      .loop-controls {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 12px 14px;
+        border-radius: 14px;
+      }
+
+      .loop-btn {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: transparent;
+        color: var(--text);
+        font-size: 1rem;
+      }
+
+      .frame-info {
+        flex: 1;
+        text-align: center;
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+
+      .radar-info {
+        margin-top: 14px;
+        padding: 16px;
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+
+      .radar-legend {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: min(360px, calc(100vw - 40px));
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(5, 8, 18, 0.88);
+        padding: 18px 20px;
+        color: var(--text);
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45),
+          0 0 35px rgba(99, 211, 255, 0.25);
+        backdrop-filter: blur(18px);
+        display: none;
+        z-index: 1200;
+        animation: legendGlow 8s ease-in-out infinite;
+      }
+
+      .radar-info strong {
+        color: var(--text);
+      }
+
+      #legendScale {
+        width: 100%;
+      }
+
+      .legend-card {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .legend-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+      }
+
+      .legend-label {
+        text-transform: uppercase;
+        letter-spacing: 0.22em;
+        font-size: 0.68rem;
+        color: rgba(255, 255, 255, 0.65);
+        margin-bottom: 6px;
+      }
+
+      .legend-title {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      .legend-subtitle {
+        margin: 6px 0 0;
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 0.85rem;
+      }
+
+      .legend-pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 6px 12px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        background: rgba(99, 211, 255, 0.12);
+        color: var(--text);
+        font-size: 0.8rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .legend-gradient {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .legend-gradient__bar {
+        position: relative;
+        height: 22px;
+        border-radius: 999px;
+        overflow: hidden;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+      }
+
+      .legend-gradient__bar::after {
+        content: "";
+        position: absolute;
+        inset: -40% 0;
+        background: linear-gradient(
+          120deg,
+          rgba(255, 255, 255, 0),
+          rgba(255, 255, 255, 0.4),
+          rgba(255, 255, 255, 0)
+        );
+        animation: gradientSheen 6s linear infinite;
+        opacity: 0.4;
+      }
+
+      .legend-gradient__minmax {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.75rem;
+        color: rgba(255, 255, 255, 0.7);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .legend-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .legend-badge {
+        flex: 1 1 140px;
+        border-radius: 14px;
+        padding: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: linear-gradient(
+          135deg,
+          rgba(255, 255, 255, 0.08),
+          rgba(255, 255, 255, 0.02)
+        );
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .legend-badge::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(
+          circle at top,
+          var(--badge-color, rgba(99, 211, 255, 0.35)),
+          transparent 60%
+        );
+        opacity: 0.6;
+        pointer-events: none;
+      }
+
+      .legend-badge__label {
+        display: block;
+        text-transform: uppercase;
+        font-size: 0.7rem;
+        letter-spacing: 0.18em;
+        color: rgba(255, 255, 255, 0.85);
+      }
+
+      .legend-badge__range {
+        display: block;
+        margin-top: 6px;
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      .legend-badge__description {
+        display: block;
+        margin-top: 4px;
+        font-size: 0.78rem;
+        color: rgba(255, 255, 255, 0.75);
+      }
+
+      .legend-footnote {
+        margin: 4px 0 0;
+        font-size: 0.75rem;
+        color: rgba(255, 255, 255, 0.65);
+      }
+
+      /* Inspector Tool Styles */
+      .inspector-toggle {
+        position: relative;
+        top: 0;
+        right: 0;
+        z-index: 1;
+        padding: 12px 18px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(5, 8, 18, 0.92);
+        backdrop-filter: blur(18px);
+        color: var(--text);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        transition: all 0.3s ease;
+      }
+
+      .inspector-toggle:hover {
+        background: rgba(10, 15, 28, 0.95);
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
         transform: translateY(-2px);
       }
 
-      .control-panel h3 {
-        margin-top: 0;
-        font-weight: 600;
-        font-size: 1.1rem;
-        margin-bottom: 16px;
-        color: white;
-        border-bottom: 1px solid var(--glass-border);
-        padding-bottom: 10px;
+      .inspector-toggle.active {
+        background: rgba(99, 211, 255, 0.15);
+        border-color: rgba(99, 211, 255, 0.4);
+        box-shadow: 0 0 25px rgba(99, 211, 255, 0.3);
       }
 
-      /* Stylish Loading Indicator */
+      .inspector-toggle-icon {
+        font-size: 1.1rem;
+      }
+
+      .inspector-display {
+        position: fixed;
+        z-index: 1250;
+        display: none;
+        min-width: 220px;
+        padding: 16px 20px;
+        border-radius: 16px;
+        border: 1px solid rgba(99, 211, 255, 0.25);
+        background: rgba(5, 8, 18, 0.95);
+        backdrop-filter: blur(20px);
+        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5),
+          0 0 32px rgba(99, 211, 255, 0.2);
+        pointer-events: none;
+      }
+
+      .inspector-display.active {
+        display: block;
+      }
+
+      .inspector-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 12px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .inspector-icon {
+        font-size: 1.1rem;
+      }
+
+      .inspector-title {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.15em;
+        color: rgba(255, 255, 255, 0.7);
+        font-weight: 500;
+      }
+
+      .inspector-value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--text);
+        line-height: 1;
+        margin-bottom: 6px;
+        text-shadow: 0 0 20px rgba(99, 211, 255, 0.4);
+      }
+
+      .inspector-unit {
+        font-size: 0.85rem;
+        color: rgba(255, 255, 255, 0.65);
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+      }
+
+      .inspector-coords {
+        margin-top: 12px;
+        padding-top: 10px;
+        border-top: 1px solid rgba(255, 255, 255, 0.05);
+        font-size: 0.75rem;
+        color: rgba(255, 255, 255, 0.6);
+        line-height: 1.6;
+      }
+
+      .inspector-no-data {
+        font-size: 0.85rem;
+        color: rgba(255, 255, 255, 0.5);
+        font-style: italic;
+      }
+
+      .slider-container {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .info-block {
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        padding: 14px;
+        background: var(--surface-muted);
+        margin-top: 12px;
+      }
+
+      .info-block__header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.85rem;
+        color: var(--muted);
+        margin-bottom: 10px;
+      }
+
+      .progress-track {
+        height: 4px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+        overflow: hidden;
+      }
+
+      .progress-bar {
+        height: 100%;
+        width: 0;
+        background: linear-gradient(90deg, var(--accent), #4f6bff);
+        transition: width 0.3s ease;
+      }
+
+      .info-banner {
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        padding: 10px 14px;
+        background: var(--accent-soft);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+
+      .spinner {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 255, 255, 0.1);
+        border-top-color: var(--accent);
+        animation: spin 1s linear infinite;
+      }
+
       .loading {
         position: absolute;
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        background: var(--glass-bg);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
+        background: var(--surface);
+        border-radius: 20px;
+        border: 1px solid var(--border);
         padding: 24px 32px;
-        border-radius: 16px;
-        display: none;
-        z-index: 1001;
-        color: white;
-        box-shadow: var(--glass-shadow);
-        border: 1px solid var(--glass-border);
-        min-width: 200px;
         text-align: center;
+        display: none;
+        color: var(--text);
+        box-shadow: var(--card-shadow);
+        min-width: 200px;
       }
 
       .loading::after {
@@ -103,8 +983,8 @@
         height: 40px;
         margin: 12px auto 0;
         border-radius: 50%;
-        border: 3px solid rgba(255, 255, 255, 0.2);
-        border-top-color: white;
+        border: 3px solid rgba(255, 255, 255, 0.15);
+        border-top-color: var(--accent);
         animation: spin 1s ease-in-out infinite;
       }
 
@@ -114,181 +994,921 @@
         }
       }
 
-      /* Modern Radar Legend */
-      .radar-legend {
-        position: absolute;
-        bottom: 30px;
-        left: 20px;
-        background: var(--glass-bg);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        padding: 16px;
-        border-radius: 16px;
-        z-index: 1000;
-        display: none;
-        color: white;
-        box-shadow: var(--glass-shadow);
-        border: 1px solid var(--glass-border);
-        transition: all 0.3s ease;
-      }
-
-      .radar-legend h4 {
-        margin-top: 0;
-        margin-bottom: 12px;
-        font-weight: 600;
-        font-size: 0.9rem;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-      }
-
-      /* Enhanced Alert Markers */
-      .alert-marker {
-        transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-        cursor: pointer;
-        border: 2px solid rgba(255, 255, 255, 0.8);
-      }
-
-      .alert-marker:hover {
-        transform: scale(1.3) translateY(-3px);
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
-      }
-
-      /* Advanced Pulse Animation */
-      @keyframes pulse {
+      @keyframes gradientSheen {
         0% {
-          box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7);
-          transform: scale(1);
+          transform: translateX(-100%);
         }
-        70% {
-          box-shadow: 0 0 0 15px rgba(255, 0, 0, 0);
-          transform: scale(1.05);
+        50% {
+          transform: translateX(0%);
         }
         100% {
-          box-shadow: 0 0 0 0 rgba(255, 0, 0, 0);
-          transform: scale(1);
+          transform: translateX(100%);
         }
       }
 
-      .pulsing-alert {
-        animation: pulse 2s infinite cubic-bezier(0.66, 0, 0, 1);
-      }
-
-      /* Enhanced Modal Animations */
-      @keyframes fadeIn {
-        from {
-          opacity: 0;
-          transform: translateY(20px);
+      @keyframes legendGlow {
+        0% {
+          box-shadow: 0 20px 50px rgba(0, 0, 0, 0.1),
+            0 0 28px rgba(0, 0, 0, 0.05);
         }
-        to {
-          opacity: 1;
-          transform: translateY(0);
+        50% {
+          box-shadow: 0 26px 60px rgba(0, 0, 0, 0.15),
+            0 0 45px rgba(0, 0, 0, 0.1);
         }
-      }
-
-      @keyframes slideUp {
-        from {
-          opacity: 0;
-          transform: translateX(-50%) translateY(40px);
-        }
-        to {
-          opacity: 1;
-          transform: translateX(-50%) translateY(0);
+        100% {
+          box-shadow: 0 20px 50px rgba(0, 0, 0, 0.1),
+            0 0 28px rgba(0, 0, 0, 0.05);
         }
       }
 
-      .fade-in {
-        animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-      }
-
-      /* Responsive adjustments */
-      @media (max-width: 768px) {
-        .control-panel {
-          top: auto;
-          bottom: 20px;
-          right: 20px;
-          max-width: calc(100% - 40px);
-        }
-
-        .radar-legend {
-          bottom: 90px;
-          left: 20px;
-        }
-      }
-
-      /* Button styling */
-      button {
-        background: rgba(255, 255, 255, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        color: white;
-        padding: 8px 16px;
-        border-radius: 8px;
-        cursor: pointer;
-        font-weight: 500;
-        transition: all 0.2s ease;
-        outline: none;
-      }
-
-      button:hover {
-        background: rgba(255, 255, 255, 0.2);
-        transform: translateY(-1px);
-      }
-
-      button:active {
-        transform: translateY(1px);
-      }
-
-      /* Scrollbar styling */
       ::-webkit-scrollbar {
         width: 8px;
-        height: 8px;
-      }
-
-      ::-webkit-scrollbar-track {
-        background: rgba(255, 255, 255, 0.05);
-        border-radius: 10px;
       }
 
       ::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.2);
-        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 999px;
       }
 
-      ::-webkit-scrollbar-thumb:hover {
-        background: rgba(255, 255, 255, 0.3);
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      /* Probe Tool Styles */
+      .probe-marker {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        transition: transform 0.2s ease;
+      }
+
+      .probe-marker:hover {
+        transform: scale(1.1);
+      }
+
+      .probe-marker__pin {
+        font-size: 1.8rem;
+        filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.4));
+      }
+
+      .probe-marker__label {
+        background: rgba(5, 8, 18, 0.95);
+        border: 1px solid rgba(99, 211, 255, 0.4);
+        border-radius: 8px;
+        padding: 2px 8px;
+        font-size: 0.7rem;
+        color: var(--text);
+        white-space: nowrap;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+      }
+
+      .probe-popup-container .maplibregl-popup-content {
+        background: rgba(5, 8, 18, 0.98);
+        border: 1px solid rgba(99, 211, 255, 0.3);
+        border-radius: 12px;
+        padding: 0;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6),
+          0 0 20px rgba(99, 211, 255, 0.2);
+        backdrop-filter: blur(20px);
+        min-width: 200px;
+      }
+
+      .probe-popup-container .maplibregl-popup-tip {
+        border-top-color: rgba(5, 8, 18, 0.98);
+      }
+
+      .probe-popup__header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 14px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .probe-popup__title {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+      }
+
+      .probe-popup__close {
+        background: none;
+        border: none;
+        color: rgba(255, 255, 255, 0.6);
+        font-size: 1.5rem;
+        cursor: pointer;
+        padding: 0;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+        transition: all 0.2s;
+      }
+
+      .probe-popup__close:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 1);
+        transform: none;
+        box-shadow: none;
+      }
+
+      .probe-popup__body {
+        padding: 14px;
+      }
+
+      .probe-popup__value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--text);
+        line-height: 1;
+        margin-bottom: 6px;
+        text-shadow: 0 0 20px rgba(99, 211, 255, 0.4);
+      }
+
+      .probe-popup__unit {
+        font-size: 0.85rem;
+        color: rgba(255, 255, 255, 0.65);
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        font-weight: 500;
+      }
+
+      .probe-popup__interpretation {
+        font-size: 0.85rem;
+        color: rgba(255, 255, 255, 0.75);
+        margin-bottom: 8px;
+      }
+
+      .probe-popup__coords {
+        font-size: 0.75rem;
+        color: rgba(255, 255, 255, 0.6);
+        padding-top: 8px;
+        border-top: 1px solid rgba(255, 255, 255, 0.05);
+      }
+
+      @media (max-width: 1200px) {
+        :root {
+          --sidebar-width: 320px;
+        }
+      }
+
+      @media (max-width: 900px) {
+        :root {
+          --sidebar-width: 100%;
+        }
+
+        #map {
+          inset: 60vh 0 0 0;
+        }
+
+        .sidebar {
+          height: 60vh;
+          width: 100%;
+          border-right: none;
+          border-bottom: 1px solid var(--panel-border);
+        }
+
+        .sidebar-hero {
+          flex-direction: column;
+        }
+
+        .radar-legend {
+          left: 20px;
+          width: auto;
+        }
+
+        .inspector-toggle {
+          top: 0;
+          padding: 10px 14px;
+          font-size: 0.85rem;
+        }
+
+        .inspector-display {
+          max-width: calc(100vw - 40px);
+        }
+      }
+
+      /* Archive Modal Styles */
+      .archive-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(8px);
+        z-index: 10000;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .archive-modal.active {
+        display: flex;
+      }
+
+      .archive-content {
+        background: linear-gradient(
+          135deg,
+          rgba(20, 25, 35, 0.98),
+          rgba(30, 35, 50, 0.98)
+        );
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        padding: 32px;
+        max-width: 500px;
+        width: 90%;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      }
+
+      .archive-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+      }
+
+      .archive-header h2 {
+        margin: 0;
+        font-size: 1.5rem;
+        color: rgba(255, 255, 255, 0.95);
+      }
+
+      .archive-close {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        color: rgba(255, 255, 255, 0.6);
+        cursor: pointer;
+        padding: 4px 8px;
+        transition: color 0.2s;
+      }
+
+      .archive-close:hover {
+        color: rgba(255, 255, 255, 1);
+      }
+
+      .datetime-picker {
+        margin-bottom: 20px;
+      }
+
+      .datetime-picker label {
+        display: block;
+        margin-bottom: 8px;
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 0.9rem;
+      }
+
+      .datetime-picker input {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.05);
+        color: rgba(255, 255, 255, 0.95);
+        font-size: 1rem;
+      }
+
+      .archive-info {
+        background: rgba(100, 150, 255, 0.1);
+        border-left: 3px solid rgba(100, 150, 255, 0.5);
+        padding: 12px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+        font-size: 0.85rem;
+        color: rgba(255, 255, 255, 0.7);
+      }
+
+      .archive-actions {
+        display: flex;
+        gap: 12px;
+      }
+
+      .archive-actions button {
+        flex: 1;
+        padding: 12px;
+        font-size: 1rem;
+      }
+
+      .archive-badge {
+        display: inline-block;
+        background: rgba(255, 150, 50, 0.2);
+        border: 1px solid rgba(255, 150, 50, 0.5);
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        color: rgba(255, 200, 100, 1);
+        margin-left: 8px;
+      }
+
+      .timestamp-item {
+        padding: 12px 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .timestamp-item:hover {
+        background: rgba(100, 150, 255, 0.15);
+      }
+
+      .timestamp-item.selected {
+        background: rgba(100, 150, 255, 0.3);
+        border-left: 3px solid rgba(100, 150, 255, 1);
+      }
+
+      .timestamp-time {
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.95);
+      }
+
+      .timestamp-badge {
+        font-size: 0.75rem;
+        padding: 2px 8px;
+        border-radius: 4px;
+        background: rgba(100, 200, 100, 0.2);
+        color: rgba(150, 255, 150, 1);
       }
     </style>
   </head>
   <body>
-    <div id="map"></div>
-    <div class="control-panel">
-      <h3>NEXRAD Radar Viewer</h3>
-      <div>
-        <label for="radarSiteSelect">Select Radar Site:</label>
-        <select id="radarSiteSelect">
-          <option value="">Loading sites...</option>
-        </select>
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <h1>⚡ NEXRAD Radar</h1>
       </div>
-      <div class="radar-controls" style="margin-top: 10px; display: none">
-        <button id="refreshRadar">Refresh Radar</button>
-        <button id="toggleRadar">Hide Radar</button>
-        <div
-          class="radar-info"
-          style="margin-top: 10px; font-size: 0.9em"
-        ></div>
+      <div class="sidebar-content">
+        <div class="sidebar-hero">
+          <div class="hero-text">
+            <p class="hero-kicker">Operational Dashboard</p>
+            <h2>Precision Radar Suite</h2>
+            <p>
+              Monitor live sweeps, build loops, and inspect pixel-level values
+              from any CONUS site in a single control surface.
+            </p>
+            <div class="hero-pills">
+              <span class="hero-pill">Live sweeps</span>
+              <span class="hero-pill hero-pill--outline">Archive ready</span>
+            </div>
+          </div>
+          <div class="hero-metrics">
+            <div>
+              <div class="hero-metric__label">Last Sweep</div>
+              <div class="hero-metric__value" id="heroSweepTime">--:--</div>
+              <div class="hero-metric__subtext">Awaiting selection</div>
+            </div>
+            <div>
+              <div class="hero-metric__label">Frames Cached</div>
+              <div class="hero-metric__value" id="heroFrameCount">0</div>
+              <div class="hero-metric__subtext">Ready for playback</div>
+            </div>
+            <div>
+              <div class="hero-metric__label">Inspector</div>
+              <div class="hero-metric__value">dBZ · kt</div>
+              <div class="hero-metric__subtext">Tap anywhere on map</div>
+            </div>
+          </div>
+        </div>
 
+        <div class="status-grid">
+          <div class="status-card">
+            <div class="status-card__label">Radar Health</div>
+            <div class="status-card__value">
+              <span class="status-dot status-dot--online"></span>
+              Live
+            </div>
+            <div class="status-card__meta">Auto-refresh every 5 min</div>
+          </div>
+          <div class="status-card">
+            <div class="status-card__label">Loop Builder</div>
+            <div class="status-card__value">Adaptive</div>
+            <div class="status-card__meta">Smart caching + pauses</div>
+          </div>
+          <div class="status-card">
+            <div class="status-card__label">Archive</div>
+            <div class="status-card__value">Date range</div>
+            <div class="status-card__meta">Instant scanning</div>
+          </div>
+        </div>
+
+        <div class="utility-card">
+          <div class="utility-card__title">
+            <span>Precision Tools</span>
+            <span class="hero-pill hero-pill--outline">Multi-probe</span>
+          </div>
+          <p class="utility-card__meta">
+            Inspector shows values on hover. Probe tool lets you place multiple
+            draggable markers for persistent monitoring.
+          </p>
+          <div class="button-group">
+            <button class="inspector-toggle" id="inspectorToggle">
+              <span class="inspector-toggle-icon">🔍</span>
+              <span>Inspector</span>
+            </button>
+            <button class="inspector-toggle" id="probeToggle">
+              <span class="inspector-toggle-icon">📍</span>
+              <span>Probe</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Radar Site Selection -->
+        <div class="control-section">
+          <div class="section-header">
+            <div>
+              <p class="section-label">Radar Site</p>
+              <h3>Acquisition</h3>
+            </div>
+            <span class="section-icon">🛰️</span>
+          </div>
+          <div class="pill-row">
+            <span class="pill">Dual-pol</span>
+            <span class="pill">Single site</span>
+            <span class="pill">Live MRMS</span>
+          </div>
+          <div class="control-group">
+            <label for="radarSiteSelect">Select Location</label>
+            <select id="radarSiteSelect">
+              <option value="">Loading sites...</option>
+            </select>
+          </div>
+          <div class="control-group">
+            <label for="radarProductSelect">Product Type</label>
+            <select id="radarProductSelect">
+              <optgroup label="Reflectivity">
+                <option value="N0B">Base Reflectivity - Tilt 1 (N0B)</option>
+                <option value="N1B">Base Reflectivity - Tilt 2 (N1B)</option>
+                <option value="N2B">Base Reflectivity - Tilt 3 (N2B)</option>
+                <option value="N3B">Base Reflectivity - Tilt 4 (N3B)</option>
+              </optgroup>
+              <optgroup label="Velocity">
+                <option value="N0G">Base Velocity - Tilt 1 (N0G)</option>
+                <option value="N1G">Base Velocity - Tilt 2 (N1G)</option>
+                <option value="N2G">Base Velocity - Tilt 3 (N2G)</option>
+                <option value="N3G">Base Velocity - Tilt 4 (N3G)</option>
+                <option value="N0V">Radial Velocity - Tilt 1 (N0V)</option>
+              </optgroup>
+              <optgroup label="Storm Relative">
+                <option value="N0S">
+                  Storm Relative Velocity - Tilt 1 (N0S)
+                </option>
+                <option value="N1S">
+                  Storm Relative Velocity - Tilt 2 (N1S)
+                </option>
+                <option value="N2S">
+                  Storm Relative Velocity - Tilt 3 (N2S)
+                </option>
+                <option value="N3S">
+                  Storm Relative Velocity - Tilt 4 (N3S)
+                </option>
+              </optgroup>
+              <optgroup label="Dual-Pol Products">
+                <option value="N0C">
+                  Correlation Coefficient - Tilt 1 (N0C)
+                </option>
+                <option value="N1C">
+                  Correlation Coefficient - Tilt 2 (N1C)
+                </option>
+                <option value="N0X">
+                  Differential Reflectivity - Tilt 1 (N0X)
+                </option>
+                <option value="N1X">
+                  Differential Reflectivity - Tilt 2 (N1X)
+                </option>
+                <option value="N0H">
+                  Hydrometeor Classification - Tilt 1 (N0H)
+                </option>
+                <option value="N1H">
+                  Hydrometeor Classification - Tilt 2 (N1H)
+                </option>
+              </optgroup>
+              <optgroup label="Advanced">
+                <option value="N0W">Spectrum Width - Tilt 1 (N0W)</option>
+                <option value="N0P">Differential Phase - Tilt 1 (N0P)</option>
+              </optgroup>
+            </select>
+          </div>
+
+          <!-- Storm Motion Controls for SRV -->
+          <div
+            class="control-group"
+            id="stormMotionControls"
+            style="display: none"
+          >
+            <label>
+              <input type="checkbox" id="enableStormMotion" />
+              Calculate Storm Relative Velocity
+            </label>
+            <div id="stormMotionInputs" style="display: none; margin-top: 8px">
+              <div style="display: flex; gap: 8px">
+                <div style="flex: 1">
+                  <label for="stormMotionU" style="font-size: 11px"
+                    >U (East) mph</label
+                  >
+                  <input
+                    type="number"
+                    id="stormMotionU"
+                    value="0"
+                    step="1"
+                    style="width: 100%"
+                  />
+                </div>
+                <div style="flex: 1">
+                  <label for="stormMotionV" style="font-size: 11px"
+                    >V (North) mph</label
+                  >
+                  <input
+                    type="number"
+                    id="stormMotionV"
+                    value="0"
+                    step="1"
+                    style="width: 100%"
+                  />
+                </div>
+              </div>
+              <p style="font-size: 10px; margin: 4px 0 0 0; opacity: 0.7">
+                Enter storm motion vectors to calculate SRV from base velocity
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Loop Animation Controls -->
+        <div class="control-section" id="loopSection" style="display: none">
+          <div class="section-header">
+            <div>
+              <p class="section-label">Loop Lab</p>
+              <h3>Animation Builder</h3>
+            </div>
+            <span class="section-icon">🎞️</span>
+          </div>
+          <p class="utility-card__meta" style="margin-top: -4px">
+            Craft bespoke loops with adaptive playback controls and progress
+            awareness.
+          </p>
+          <div class="control-group">
+            <label for="frameCount">Number of Frames</label>
+            <input type="number" id="frameCount" min="2" max="30" value="10" />
+          </div>
+
+          <div class="slider-container">
+            <label for="loopSpeed">Playback Speed</label>
+            <input
+              type="range"
+              id="loopSpeed"
+              min="50"
+              max="1000"
+              step="50"
+              value="100"
+            />
+            <span class="slider-value" id="loopSpeedValue">100ms</span>
+          </div>
+
+          <div class="slider-container">
+            <label for="endPauseDuration">End Frame Pause</label>
+            <input
+              type="range"
+              id="endPauseDuration"
+              min="0"
+              max="5000"
+              step="100"
+              value="1000"
+            />
+            <span class="slider-value" id="endPauseDurationValue">1000ms</span>
+          </div>
+
+          <button id="loadLoopBtn" style="width: 100%">
+            Load & Play Animation
+          </button>
+
+          <div id="loadingProgress" class="info-block" style="display: none">
+            <div class="info-block__header">
+              <span>Loading frames</span>
+              <span id="progressText" style="color: var(--text)">0%</span>
+            </div>
+            <div class="progress-track">
+              <div id="progressBar" class="progress-bar"></div>
+            </div>
+          </div>
+
+          <div
+            class="loop-controls"
+            id="loopControlsContainer"
+            style="display: none; margin-top: 12px"
+          >
+            <div style="display: flex; align-items: center; gap: 12px">
+              <button
+                class="loop-btn"
+                id="playPauseBtn"
+                title="Play/Pause"
+                style="flex-shrink: 0"
+              >
+                ▶️
+              </button>
+              <div style="flex: 1">
+                <div
+                  class="frame-info"
+                  style="text-align: center; font-size: 0.9rem"
+                >
+                  <span id="currentFrame">0</span> /
+                  <span id="totalFrames">0</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Radar Controls -->
+        <div
+          class="control-section"
+          id="radarControlsSection"
+          style="display: none"
+        >
+          <div class="section-header">
+            <div>
+              <p class="section-label">Live Layer</p>
+              <h3>Radar Controls</h3>
+            </div>
+            <span class="section-icon">🛰️</span>
+          </div>
+          <div class="button-group">
+            <button id="refreshRadar">🔄 Refresh</button>
+            <button id="toggleRadar" class="button-ghost">Hide</button>
+            <button id="archiveRadar">📅 Archive</button>
+          </div>
+
+          <div class="control-group" style="margin-top: 12px">
+            <label for="palFileInput">Custom Palette (.pal)</label>
+            <input
+              type="file"
+              id="palFileInput"
+              accept=".pal"
+              style="font-size: 0.85rem; padding: 6px; cursor: pointer"
+            />
+            <div
+              id="palFileStatus"
+              style="
+                font-size: 0.8rem;
+                margin-top: 6px;
+                color: rgba(255, 255, 255, 0.6);
+              "
+            ></div>
+          </div>
+
+          <div class="control-group">
+            <label>
+              <input type="checkbox" id="enableSmoothing" />
+              Enable Bilinear Smoothing
+            </label>
+            <p style="font-size: 11px; opacity: 0.7; margin: 6px 0 0 0">
+              Applies interpolation for smoother reflectivity visualization
+            </p>
+          </div>
+
+          <div class="radar-info"></div>
+        </div>
+
+        <!-- 3D Tilt Mode Controls -->
+        <div class="control-section" id="tilt3DSection" style="display: none">
+          <div class="section-header">
+            <div>
+              <p class="section-label">Experimental</p>
+              <h3>3D Tilt Mode</h3>
+            </div>
+            <span class="section-icon">🌐</span>
+          </div>
+          <p
+            style="
+              font-size: 12px;
+              color: rgba(255, 255, 255, 0.7);
+              margin-bottom: 12px;
+            "
+          >
+            💡 Tilt the map (Ctrl+drag or right-click drag) to see the 3D
+            effect!
+          </p>
+
+          <div class="control-group">
+            <label>
+              <input type="checkbox" id="enable3DTilt" />
+              Enable 3D Beam Elevation
+            </label>
+          </div>
+
+          <div id="tilt3DControls" style="display: none">
+            <div class="slider-container">
+              <label for="beamElevation">Beam Angle</label>
+              <input
+                type="range"
+                id="beamElevation"
+                min="0.5"
+                max="20"
+                step="0.5"
+                value="0.5"
+              />
+              <span class="slider-value" id="beamElevationValue">0.5°</span>
+            </div>
+
+            <div class="slider-container">
+              <label for="tiltExaggeration">Height Exaggeration</label>
+              <input
+                type="range"
+                id="tiltExaggeration"
+                min="1"
+                max="50"
+                step="1"
+                value="10"
+              />
+              <span class="slider-value" id="tiltExaggerationValue">10x</span>
+            </div>
+
+            <div class="control-group">
+              <label>
+                <input type="checkbox" id="enableShadows" checked />
+                Enable Shadows
+              </label>
+            </div>
+
+            <div class="slider-container">
+              <label for="shadowOpacity">Shadow Opacity</label>
+              <input
+                type="range"
+                id="shadowOpacity"
+                min="0"
+                max="100"
+                step="5"
+                value="30"
+              />
+              <span class="slider-value" id="shadowOpacityValue">30%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Weather Alerts Settings -->
+        <div class="control-section">
+          <div class="section-header">
+            <div>
+              <p class="section-label">Safety Layer</p>
+              <h3>Alert Settings</h3>
+            </div>
+            <span class="section-icon">⚠️</span>
+          </div>
+          <div class="control-group">
+            <label>
+              <input type="checkbox" id="enableAlertFlashing" checked />
+              Enable Critical Alert Flashing
+            </label>
+            <p style="font-size: 11px; opacity: 0.7; margin: 6px 0 0 0">
+              Tornado, Severe Storm, and Flash Flood warnings will flash
+            </p>
+          </div>
+        </div>
+
+        <div class="timeline-block">
+          <div class="timeline-step">
+            <span class="timeline-dot"></span>
+            <div class="timeline-content">
+              <p class="timeline-label">Ingest complete</p>
+              <p class="timeline-meta">Awaiting next sweep · Site dependent</p>
+            </div>
+          </div>
+          <div class="timeline-step">
+            <span class="timeline-dot"></span>
+            <div class="timeline-content">
+              <p class="timeline-label">Loop cache</p>
+              <p class="timeline-meta">Watch frame progress for long loops</p>
+            </div>
+          </div>
+          <div class="timeline-step">
+            <span class="timeline-dot"></span>
+            <div class="timeline-content">
+              <p class="timeline-label">Archive fetch</p>
+              <p class="timeline-meta">
+                Use the Archive panel to explore history
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Status Messages -->
+        <div id="sidebarStatus" class="info-banner" style="display: none">
+          <div class="spinner"></div>
+          <span id="statusText">Loading...</span>
         </div>
       </div>
     </div>
-    <div class="loading" id="loadingIndicator">Loading radar data...</div>
+
+    <div id="map"></div>
+
+    <!-- Inspector Tool Toggle -->
+
+    <!-- Inspector Value Display -->
+    <div class="inspector-display" id="inspectorDisplay">
+      <div class="inspector-header">
+        <span class="inspector-icon">📊</span>
+        <span class="inspector-title">Radar Value</span>
+      </div>
+      <div id="inspectorContent">
+        <div class="inspector-value" id="inspectorValue">--</div>
+        <div class="inspector-unit" id="inspectorUnit">dBZ</div>
+        <div class="inspector-coords" id="inspectorCoords">
+          Lat: --<br />Lon: --
+        </div>
+      </div>
+    </div>
+
+    <!-- Radar Legend (floating overlay on map) -->
     <div class="radar-legend" id="radarLegend">
-      <h4>Reflectivity (dBZ)</h4>
       <div id="legendScale"></div>
     </div>
 
     <!-- Dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
     <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
-    <!-- deck.gl and papaparse were removed as they are not needed for the WebGL custom layer -->
+
+    <!-- Archive Modal -->
+    <div class="archive-modal" id="archiveModal">
+      <div class="archive-content">
+        <div class="archive-header">
+          <h2>📅 Archive Radar Data</h2>
+          <button class="archive-close" id="archiveClose">×</button>
+        </div>
+
+        <div class="archive-info">
+          💡 Select a date to view available radar scans and historical warnings
+          from the NEXRAD archive.
+        </div>
+
+        <div class="datetime-picker">
+          <label for="archiveDate">Date (UTC)</label>
+          <input type="date" id="archiveDate" />
+        </div>
+
+        <div
+          id="timestampLoader"
+          style="
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: rgba(255, 255, 255, 0.7);
+          "
+        >
+          <div style="font-size: 1.2rem">⏳</div>
+          <div>Loading available timestamps...</div>
+        </div>
+
+        <div id="timestampList" style="display: none; margin-bottom: 20px">
+          <label
+            style="
+              display: block;
+              margin-bottom: 8px;
+              color: rgba(255, 255, 255, 0.8);
+              font-size: 0.9rem;
+            "
+          >
+            Available Scans (<span id="timestampCount">0</span>)
+          </label>
+          <div
+            id="timestampContainer"
+            style="
+              max-height: 300px;
+              overflow-y: auto;
+              border: 1px solid rgba(255, 255, 255, 0.2);
+              border-radius: 8px;
+              background: rgba(0, 0, 0, 0.3);
+            "
+          ></div>
+        </div>
+
+        <div class="archive-actions">
+          <button
+            id="archiveClearBtn"
+            style="background: rgba(255, 100, 100, 0.2)"
+          >
+            Clear Archive
+          </button>
+          <button
+            id="archiveFetchBtn"
+            style="
+              background: linear-gradient(
+                135deg,
+                rgba(100, 150, 255, 0.3),
+                rgba(150, 100, 255, 0.3)
+              );
+            "
+          >
+            Find Scans
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- Your application code -->
     <script src="app.js"></script>

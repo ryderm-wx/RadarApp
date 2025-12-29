@@ -1,28 +1,59 @@
-// --- Constants (Defined once, used globally) ---
-const MAPTILER_API_KEY = "SskdAs3Zk3tm9lBUtRKN"; // Replace with your MapTiler API key
+const MAPTILER_API_KEY = "SskdAs3Zk3tm9lBUtRKN";
 const NEXRAD_BUCKET_URL = "https://unidata-nexrad-level3.s3.amazonaws.com";
 const RADAR_SITES_URL =
-  "https://www.ncei.noaa.gov/access/homr/file/nexrad-stations.csv"; // Example source
+  "https://www.ncei.noaa.gov/access/homr/file/nexrad-stations.csv";
 
-// Define icons for different event codes
-const icons = {
-  "TO.W": "🌪️", // Tornado Warning
-  "SV.W": "⛈️", // Severe Thunderstorm Warning
-  "FF.W": "🌊", // Flash Flood Warning
-  "FL.W": "💧", // Flood Warning
-  "HU.W": "🌀", // Hurricane Warning
-  "WS.W": "❄️", // Winter Storm Warning
-  "BZ.W": "❄️", // Blizzard Warning
-  "IS.W": "🧊", // Ice Storm Warning
-  "HS.W": "🌨️", // Heavy Snow Warning
-  "FW.W": "🔥", // Fire Weather Warning
-  "HW.W": "💨", // High Wind Warning
-  "EH.W": "🌡️", // Excessive Heat Warning
-  "EC.W": "🥶", // Extreme Cold Warning
-  // Add more event codes and icons as needed
+let enable3DTilt = false;
+let beamElevationAngle = 0.5;
+let tiltExaggeration = 10;
+let enableShadows = true;
+let shadowOpacity = 0.3;
+let radarSiteLocation = null;
+
+let enableAlertFlashing = true;
+let flashMode = "hard";
+let flashSpeed = 500;
+let selectedAlert = null;
+let alertFlashInterval = null;
+
+let coordinatePromptMarker = null;
+let coordinatePromptCard = null;
+
+let countiesData = null;
+
+const LONG_PRESS_MS = 500;
+const LONG_PRESS_MOVE_TOLERANCE = 6;
+let longPressTimer = null;
+let longPressStartPoint = null;
+
+const ALERT_OUTLINE_CONFIG = {
+  innerWidth: 5,
+  outerWidth: 8,
+  innerColor: (alertColor) => alertColor,
+  outerColor: "#000000ff",
+  innerOpacity: 1.0,
+  outerOpacity: 1.0,
+  fillOpacity: 0.15,
 };
 
-// Define the color expression once globally, as it's static
+const icons = {
+  "TO.W": "🌪️",
+  "SV.W": "⛈️",
+  "FF.W": "🌊",
+  "FL.W": "💧",
+  "HU.W": "🌀",
+  "WS.W": "❄️",
+  "BZ.W": "❄️",
+  "IS.W": "🧊",
+  "HS.W": "🌨️",
+  "FW.W": "🔥",
+  "HW.W": "💨",
+  "EH.W": "🌡️",
+  "EC.W": "🥶",
+};
+
+const MS_TO_MPH = 2.23694;
+
 const DBZ_COLOR_EXPRESSION = [
   "interpolate",
   ["linear"],
@@ -413,80 +444,533 @@ const DBZ_COLOR_EXPRESSION = [
   "rgba(262,262,262,0.8)",
 ];
 
+const REFLECTIVITY_COLOR_EXPRESSION = DBZ_COLOR_EXPRESSION;
+
 const VELOCITY_COLOR_EXPRESSION = [
   "interpolate",
   ["linear"],
-  ["get", "dbz"], // The attribute name is still 'dbz' in the shader, but it holds velocity
-  -200,
-  "rgba(255, 220, 220, 0.8)",
-  -140,
-  "rgba(255, 20, 180, 0.8)",
-  -120,
-  "rgba(114, 3, 141, 0.8)",
-  -100,
-  "rgba(32, 1, 141, 0.8)",
-  -90,
-  "rgba(47, 215, 225, 0.8)",
+  ["get", "dbz"],
   -70,
-  "rgba(172, 239, 242, 0.8)",
+  "rgba(0, 100, 0, 0.9)",
   -50,
-  "rgba(33, 253, 50, 0.8)",
+  "rgba(0, 150, 0, 0.9)",
   -40,
-  "rgba(15, 99, 20, 0.8)",
+  "rgba(50, 200, 50, 0.9)",
+  -30,
+  "rgba(100, 220, 100, 0.9)",
+  -20,
+  "rgba(150, 240, 150, 0.9)",
   -10,
-  "rgba(106, 125, 105, 0.8)",
+  "rgba(200, 255, 200, 0.9)",
+  -5,
+  "rgba(230, 255, 230, 0.9)",
+  -2,
+  "rgba(245, 255, 245, 0.9)",
   0,
-  "rgba(122, 48, 57, 0.8)", // Center of the scale
+  "rgba(200, 200, 200, 0.5)",
+  2,
+  "rgba(255, 245, 245, 0.9)",
+  5,
+  "rgba(255, 230, 230, 0.9)",
   10,
-  "rgba(242, 1, 6, 0.8)",
+  "rgba(255, 200, 200, 0.9)",
+  20,
+  "rgba(255, 150, 150, 0.9)",
+  30,
+  "rgba(255, 100, 100, 0.9)",
   40,
-  "rgba(255, 142, 212, 0.8)",
-  55,
-  "rgba(255, 221, 176, 0.8)",
+  "rgba(255, 50, 50, 0.9)",
+  50,
+  "rgba(220, 0, 0, 0.9)",
   60,
-  "rgba(255, 151, 86, 0.8)",
-  80,
-  "rgba(254, 137, 80, 0.8)",
-  120,
-  "rgba(97, 6, 2, 0.8)",
-  140,
-  "rgba(60, 0, 0, 0.8)",
-  200,
-  "rgba(45, 0, 0, 0.8)",
+  "rgba(180, 0, 0, 0.9)",
+  70,
+  "rgba(120, 0, 0, 0.9)",
   999,
-  "rgba(123, 0, 200, 0.8)", // RF (Range Folded) color
+  "rgba(123, 0, 200, 0.8)",
 ];
 
-// --- Global variables for map state (managed carefully) ---
-const radarLayerId = "radar-webgl-layer"; // NEW: ID for the custom WebGL layer
-const sweepSourceId = "radar-sweep"; // New ID for the sweep source
-const sweepLayerId = "radar-sweep-layer"; // New ID for the sweep layer
-let selectedRadarSite = null;
-let mapInstance = null;
-// NEW: Global variable to hold the actual custom layer instance
-let customRadarLayerInstance = null;
+/**
+  "rgba(97, 6, 2, 1.0)",
+  140,
+  "rgba(60, 0, 0, 1.0)",
+  200,
+  "rgba(45, 0, 0, 1.0)",
+  999, // Handling Range Folding (RF) values
+  "rgba(123, 0, 200, 0.8)",
+];
 
-// --- Sweep Animation Variables ---
-// Current sweep animation variables
-// Enhanced sweep animation variables
+/**
+ * Parse a .pal (palette) file content
+ * @param {string} palText - The text content of a .pal file
+ * @returns {object} Parsed palette with product, units, and color stops
+ */
+function parsePalFile(palText) {
+  const lines = palText
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#"));
+
+  let product = null;
+  let units = null;
+  let scale = 1.0;
+  const colors = [];
+  let rfColor = null;
+
+  for (const line of lines) {
+    const lowerLine = line.toLowerCase();
+
+    if (lowerLine.startsWith("product:")) {
+      product = line.split(":")[1].trim();
+    } else if (lowerLine.startsWith("units:")) {
+      units = line.split(":")[1].trim();
+    } else if (lowerLine.startsWith("scale:")) {
+      const scaleStr = line.split(":")[1].trim();
+      const parsedScale = parseFloat(scaleStr);
+      if (!isNaN(parsedScale)) {
+        scale = parsedScale;
+      }
+    } else if (lowerLine.startsWith("rf:")) {
+      const parts = line.substring(3).trim().split(/\s+/);
+      if (parts.length >= 3) {
+        const r = parseInt(parts[0]);
+        const g = parseInt(parts[1]);
+        const b = parseInt(parts[2]);
+        if (!isNaN(r) && !isNaN(g) && !isNaN(b)) {
+          rfColor = { r, g, b };
+        }
+      }
+    } else if (lowerLine.startsWith("color:")) {
+      const parts = line.substring(6).trim().split(/\s+/);
+      if (parts.length >= 4) {
+        const value = parseFloat(parts[0]);
+        const r = parseInt(parts[1]);
+        const g = parseInt(parts[2]);
+        const b = parseInt(parts[3]);
+
+        if (!isNaN(value) && !isNaN(r) && !isNaN(g) && !isNaN(b)) {
+          colors.push({ value, r, g, b });
+        }
+      }
+    }
+  }
+
+  colors.sort((a, b) => a.value - b.value);
+
+  if (rfColor) {
+    colors.push({ value: 999, r: rfColor.r, g: rfColor.g, b: rfColor.b });
+  }
+
+  console.log("Parsed palette:", {
+    product,
+    units,
+    scale,
+    colorCount: colors.length,
+    valueRange:
+      colors.length > 0
+        ? [colors[0].value, colors[colors.length - 1].value]
+        : [],
+  });
+
+  return { product, units, scale, colors };
+}
+
+/**
+ * Convert a parsed .pal palette to a MapLibre color expression
+ * @param {object} palette - Parsed palette from parsePalFile
+ * @returns {array} MapLibre-compatible color expression
+ */
+function palToColorExpression(palette) {
+  const expression = ["interpolate", ["linear"], ["get", "dbz"]];
+
+  const scale = palette.scale || 1.0;
+
+  for (const color of palette.colors) {
+    expression.push(color.value / scale);
+    expression.push(`rgba(${color.r}, ${color.g}, ${color.b}, 0.9)`);
+  }
+
+  return expression;
+}
+
+/**
+ * Helper function to get color expression and metadata for a given radar product
+ */
+function getRadarProductInfo(product) {
+  if (customPalettes[product]) {
+    const palette = customPalettes[product];
+    const hasNegativeValues = palette.colors.some((c) => c.value < 0);
+    const isVel =
+      palette.units &&
+      (palette.units.toLowerCase().includes("mph") ||
+        palette.units.toLowerCase().includes("m/s") ||
+        palette.units.toLowerCase().includes("knot") ||
+        hasNegativeValues);
+
+    return {
+      name: palette.name || `${product} (Custom)`,
+      colorExpression: palToColorExpression(palette),
+      unit: palette.units || "units",
+      isVelocity: isVel,
+      scale: palette.scale || 1.0,
+    };
+  }
+
+  const tiltMatch = product.match(/^N([0-3])([A-Z])$/);
+  const tilt = tiltMatch ? parseInt(tiltMatch[1]) + 1 : 1;
+  const baseProduct = tiltMatch
+    ? tiltMatch[2]
+    : product.charAt(product.length - 1);
+  const tiltLabel = tilt > 1 ? ` (Tilt ${tilt})` : "";
+
+  const productMap = {
+    B: {
+      name: `Base Reflectivity${tiltLabel}`,
+      colorExpression: REFLECTIVITY_COLOR_EXPRESSION,
+      unit: "dBZ",
+      isVelocity: false,
+    },
+    G: {
+      name: `Base Velocity${tiltLabel}`,
+      colorExpression: VELOCITY_COLOR_EXPRESSION,
+      unit: "mph",
+      isVelocity: true,
+    },
+    V: {
+      name: `Radial Velocity${tiltLabel}`,
+      colorExpression: VELOCITY_COLOR_EXPRESSION,
+      unit: "mph",
+      isVelocity: true,
+    },
+    S: {
+      name: `Storm Relative Velocity${tiltLabel}`,
+      colorExpression: VELOCITY_COLOR_EXPRESSION,
+      unit: "mph",
+      isVelocity: true,
+      requiresCalculation: true,
+    },
+    C: {
+      name: `Correlation Coefficient${tiltLabel}`,
+      colorExpression: [
+        "interpolate",
+        ["linear"],
+        ["get", "dbz"],
+        0,
+        "#000000",
+        0.1,
+        "#4B0082",
+        0.3,
+        "#0000FF",
+        0.5,
+        "#00FF00",
+        0.7,
+        "#FFFF00",
+        0.85,
+        "#FF7F00",
+        0.95,
+        "#FF0000",
+        1.0,
+        "#FFFFFF",
+      ],
+      unit: "CC",
+      isVelocity: false,
+    },
+    X: {
+      name: `Differential Reflectivity${tiltLabel}`,
+      colorExpression: [
+        "interpolate",
+        ["linear"],
+        ["get", "dbz"],
+        -4,
+        "#0000FF",
+        -2,
+        "#00FFFF",
+        0,
+        "#00FF00",
+        2,
+        "#FFFF00",
+        4,
+        "#FF0000",
+        6,
+        "#FF00FF",
+      ],
+      unit: "dB",
+      isVelocity: false,
+    },
+    H: {
+      name: `Hydrometeor Classification${tiltLabel}`,
+      colorExpression: [
+        "match",
+        ["get", "dbz"],
+        0,
+        "#9C9C9C",
+        10,
+        "#00ECEC",
+        20,
+        "#019FF4",
+        30,
+        "#FFFF00",
+        40,
+        "#FE00FE",
+        50,
+        "#9E0000",
+        60,
+        "#00FF00",
+        70,
+        "#00BB00",
+        80,
+        "#FE0000",
+        90,
+        "#9600B4",
+        100,
+        "#FFFFFF",
+        140,
+        "#649696",
+        150,
+        "#000000",
+        "#CCCCCC",
+      ],
+      unit: "Class",
+      isVelocity: false,
+    },
+    W: {
+      name: `Spectrum Width${tiltLabel}`,
+      colorExpression: [
+        "interpolate",
+        ["linear"],
+        ["get", "dbz"],
+        0,
+        "#000000",
+        2,
+        "#0000FF",
+        4,
+        "#00FF00",
+        6,
+        "#FFFF00",
+        8,
+        "#FF7F00",
+        10,
+        "#FF0000",
+      ],
+      unit: "mph",
+      isVelocity: false,
+    },
+    P: {
+      name: `Differential Phase${tiltLabel}`,
+      colorExpression: [
+        "interpolate",
+        ["linear"],
+        ["get", "dbz"],
+        0,
+        "#000000",
+        45,
+        "#0000FF",
+        90,
+        "#00FF00",
+        135,
+        "#FFFF00",
+        180,
+        "#FF0000",
+      ],
+      unit: "degrees",
+      isVelocity: false,
+    },
+  };
+
+  return productMap[baseProduct] || productMap.B;
+}
+
+const radarLayerId = "radar-webgl-layer";
+const sweepSourceId = "radar-sweep";
+const sweepLayerId = "radar-sweep-layer";
+let selectedRadarSite = null;
+let selectedRadarProduct = "N0B";
+let mapInstance = null;
+let customRadarLayerInstance = null;
+let radarSitesCache = [];
+
+let stormMotionU = 0;
+let stormMotionV = 0;
+let useStormMotion = false;
+
 let currentSweepAngle = 0;
 let animationFrameId = null;
 const SWEEP_SPEED_DPS = 0.2;
-const SWEEP_WIDTH = 10; // Slightly wider for better visibility
+const SWEEP_WIDTH = 10;
 const SWEEP_RADIUS_KM = 500;
-const SWEEP_ARC_STEPS = 500; // More steps for smoother arc
-const SWEEP_OPACITY = 0.9; // Control overall opacity
-const SWEEP_FADE_TAIL = true; // Enable fading tail effect
-const SWEEP_TAIL_LENGTH = 60; // Length of the fading tail in degrees
-const SWEEP_COLOR = "rgba(255, 255, 255, 0.9)"; // Main color
-const SWEEP_GLOW_COLOR = "rgba(120, 200, 255, 0.6)"; // Subtle blue glow
+const SWEEP_ARC_STEPS = 500;
+const SWEEP_OPACITY = 0.9;
+const SWEEP_FADE_TAIL = true;
+const SWEEP_TAIL_LENGTH = 60;
+const SWEEP_COLOR = "rgba(255, 255, 255, 0.9)";
+const SWEEP_GLOW_COLOR = "rgba(120, 200, 255, 0.6)";
 
-// Add these global variables to track alerts
 let activeAlerts = new Map();
-let selectedAlert = null;
 let alertDetailsElement = null;
 
-// Initialize the SSE connection to receive live alerts
+let inspectorEnabled = false;
+let inspectorMouseHandler = null;
+
+let probeToolEnabled = false;
+let probeMarkers = [];
+let probeIdCounter = 0;
+let draggedProbe = null;
+
+let customPalettes = {};
+let isArchiveMode = false;
+let archiveTimestamp = null;
+let archiveProductCache = {};
+
+let enableSmoothing = false;
+
+const COORD_KEY_PRECISION = 1e5;
+
+function makeCoordKey(lng, lat) {
+  return `${Math.round(lng * COORD_KEY_PRECISION)}|${Math.round(
+    lat * COORD_KEY_PRECISION
+  )}`;
+}
+
+function computeBilinearCornerValues(vertices, values) {
+  if (
+    !vertices ||
+    !values ||
+    vertices.length / 2 !== values.length ||
+    values.length < 6
+  ) {
+    return null;
+  }
+
+  const stats = new Map();
+  const uniqueCornerOffsets = [0, 1, 2, 5];
+
+  for (let base = 0; base <= values.length - 6; base += 6) {
+    const gateValue = values[base];
+    const corners = uniqueCornerOffsets.map((offset) => {
+      const vertexIndex = base + offset;
+      const lng = vertices[vertexIndex * 2];
+      const lat = vertices[vertexIndex * 2 + 1];
+      return { lng, lat, key: makeCoordKey(lng, lat) };
+    });
+
+    const centerLng =
+      corners.reduce((sum, c) => sum + c.lng, 0) / corners.length;
+    const centerLat =
+      corners.reduce((sum, c) => sum + c.lat, 0) / corners.length;
+
+    corners.forEach(({ lng, lat, key }) => {
+      const dx = lng - centerLng;
+      const dy = lat - centerLat;
+      const dist = Math.max(Math.hypot(dx, dy), 1e-6);
+      const weight = 1 / dist;
+      const entry = stats.get(key) || { sum: 0, weight: 0 };
+      entry.sum += gateValue * weight;
+      entry.weight += weight;
+      stats.set(key, entry);
+    });
+  }
+
+  const smoothed = new Float32Array(values.length);
+  for (
+    let valueIndex = 0, vertexOffset = 0;
+    valueIndex < values.length;
+    valueIndex++
+  ) {
+    const lng = vertices[vertexOffset];
+    const lat = vertices[vertexOffset + 1];
+    const key = makeCoordKey(lng, lat);
+    const entry = stats.get(key);
+    smoothed[valueIndex] =
+      entry && entry.weight > 0 ? entry.sum / entry.weight : values[valueIndex];
+    vertexOffset += 2;
+  }
+
+  return smoothed;
+}
+
+/**
+ * Calculate Storm Relative Velocity from base velocity data
+ * SRV = Vr - (U*sin(θ) + V*cos(θ))
+ * where U and V are storm motion components, θ is azimuth
+ * @param {Float32Array} vertices - Radar gate vertices (lng, lat pairs)
+ * @param {Float32Array} velocities - Base velocity values in mph
+ * @param {number} radarLon - Radar site longitude
+ * @param {number} radarLat - Radar site latitude
+ * @param {number} stormU - Storm motion U component (eastward) in mph
+ * @param {number} stormV - Storm motion V component (northward) in mph
+ * @returns {Float32Array} - Storm relative velocity values
+ */
+function calculateStormRelativeVelocity(
+  vertices,
+  velocities,
+  radarLon,
+  radarLat,
+  stormU,
+  stormV
+) {
+  const srv = new Float32Array(velocities.length);
+
+  for (let i = 0; i < velocities.length; i += 6) {
+    const gateLon =
+      (vertices[i * 2] + vertices[(i + 1) * 2] + vertices[(i + 2) * 2]) / 3;
+    const gateLat =
+      (vertices[i * 2 + 1] +
+        vertices[(i + 1) * 2 + 1] +
+        vertices[(i + 2) * 2 + 1]) /
+      3;
+
+    const dLon = (gateLon - radarLon) * Math.cos((radarLat * Math.PI) / 180);
+    const dLat = gateLat - radarLat;
+    const azimuthRad = Math.atan2(dLon, dLat);
+
+    const stormMotionRadial =
+      stormU * Math.sin(azimuthRad) + stormV * Math.cos(azimuthRad);
+
+    for (let j = 0; j < 6; j++) {
+      const velIdx = i + j;
+      srv[velIdx] = velocities[velIdx] - stormMotionRadial;
+    }
+  }
+
+  return srv;
+}
+
+function loadPalettesFromStorage() {
+  try {
+    const stored = localStorage.getItem("radarCustomPalettes");
+    if (stored) {
+      customPalettes = JSON.parse(stored);
+      console.log("Loaded palettes from storage:", Object.keys(customPalettes));
+    }
+  } catch (error) {
+    console.error("Error loading palettes from storage:", error);
+  }
+}
+
+function savePalettesToStorage() {
+  try {
+    localStorage.setItem("radarCustomPalettes", JSON.stringify(customPalettes));
+    console.log("Saved palettes to storage");
+  } catch (error) {
+    console.error("Error saving palettes to storage:", error);
+  }
+}
+
+async function loadCountiesData() {
+  try {
+    const response = await fetch("counties.geojson");
+    if (!response.ok) {
+      throw new Error(
+        `Failed to load counties.geojson: ${response.statusText}`
+      );
+    }
+    countiesData = await response.json();
+    console.log(`✅ Loaded ${countiesData.features.length} counties`);
+  } catch (error) {
+    console.error("❌ Error loading counties data:", error);
+  }
+}
+
 function initAlertFeed() {
   const eventSource = new EventSource(
     "https://xmpp-api-production.up.railway.app/live-alerts"
@@ -519,7 +1003,6 @@ function initAlertFeed() {
 
   eventSource.onerror = (error) => {
     console.error("SSE connection error:", error);
-    // Try to reconnect after a delay
     setTimeout(() => {
       eventSource.close();
       initAlertFeed();
@@ -527,20 +1010,16 @@ function initAlertFeed() {
   };
 }
 
-// Function to create and show alerts dropdown
 function showAlertsDropdown(position) {
-  // Remove any existing dropdown
   const existingDropdown = document.getElementById("alerts-dropdown");
   if (existingDropdown) {
     existingDropdown.remove();
   }
 
-  // Get all alerts in the current view
   const alertsInView = Array.from(activeAlerts.values());
 
   if (alertsInView.length === 0) return;
 
-  // Create dropdown element
   const dropdown = document.createElement("div");
   dropdown.id = "alerts-dropdown";
   dropdown.style.position = "absolute";
@@ -555,7 +1034,6 @@ function showAlertsDropdown(position) {
   dropdown.style.overflow = "auto";
   dropdown.style.padding = "10px";
 
-  // Add header
   const header = document.createElement("div");
   header.style.borderBottom = "1px solid #eee";
   header.style.paddingBottom = "10px";
@@ -565,7 +1043,6 @@ function showAlertsDropdown(position) {
                       <span class="close-dropdown" style="float:right; cursor:pointer;">×</span>`;
   dropdown.appendChild(header);
 
-  // Add alerts
   alertsInView.forEach((alert) => {
     const alertItem = document.createElement("div");
     alertItem.className = "dropdown-alert-item";
@@ -573,11 +1050,10 @@ function showAlertsDropdown(position) {
     alertItem.style.margin = "5px 0";
     alertItem.style.borderRadius = "5px";
     alertItem.style.cursor = "pointer";
-    alertItem.style.borderLeft = `4px solid ${getAlertColor(alert.eventCode)}`;
+    alertItem.style.borderLeft = `4px solid ${getAlertColor(alert)}`;
     alertItem.style.backgroundColor = "#f8f8f8";
     alertItem.style.transition = "background-color 0.2s";
 
-    // Get icon for the alert
     const icon = getAlertIcon(alert.eventCode);
 
     alertItem.innerHTML = `
@@ -592,7 +1068,6 @@ function showAlertsDropdown(position) {
       </div>
     `;
 
-    // Hover effect
     alertItem.addEventListener("mouseover", () => {
       alertItem.style.backgroundColor = "#f0f0f0";
     });
@@ -600,7 +1075,6 @@ function showAlertsDropdown(position) {
       alertItem.style.backgroundColor = "#f8f8f8";
     });
 
-    // Click to open full alert
     alertItem.addEventListener("click", () => {
       dropdown.remove();
       showAlertDetails(alert);
@@ -609,12 +1083,10 @@ function showAlertsDropdown(position) {
     dropdown.appendChild(alertItem);
   });
 
-  // Add close functionality
   dropdown.querySelector(".close-dropdown").addEventListener("click", () => {
     dropdown.remove();
   });
 
-  // Close when clicking outside
   document.addEventListener(
     "click",
     (e) => {
@@ -633,9 +1105,7 @@ function showAlertsDropdown(position) {
   return dropdown;
 }
 
-// Create a button to toggle the alerts dropdown
 function createAlertsToggleButton() {
-  // Remove existing button if present
   const existing = document.querySelector(".alerts-toggle-btn");
   if (existing) existing.remove();
 
@@ -680,7 +1150,6 @@ function createAlertsToggleButton() {
   return button;
 }
 
-// Update the toggle button when alerts change
 function updateAlertsButton() {
   const button = document.querySelector(".alerts-toggle-btn");
   if (!button) {
@@ -692,7 +1161,6 @@ function updateAlertsButton() {
   if (countElement) {
     countElement.textContent = activeAlerts.size;
 
-    // Make the button pulse when there are alerts
     if (activeAlerts.size > 0) {
       button.style.animation = "pulse 2s infinite";
     } else {
@@ -701,7 +1169,6 @@ function updateAlertsButton() {
   }
 }
 
-// Add this to your CSS
 const style = document.createElement("style");
 style.textContent = `
   @keyframes pulse {
@@ -716,68 +1183,259 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-// Modify your alert handling functions to update the button
 function addAlertToMap(alert) {
+  // Detect special weather statements from SSE or product
+  try {
+    if (alert.eventName && /severe weather statement/i.test(alert.eventName)) {
+      alert.isSpecialWeatherStatement = true;
+    }
+    if (!alert.isSpecialWeatherStatement && alert.rawText) {
+      if (/Severe Weather Statement/i.test(alert.rawText)) {
+        alert.isSpecialWeatherStatement = true;
+      }
+    }
+  } catch (e) {
+    console.warn("Error detecting special weather statement:", e);
+  }
   if (activeAlerts.has(alert.id)) {
     updateAlertOnMap(alert);
     return;
   }
 
-  // Store the alert in our collection
   activeAlerts.set(alert.id, alert);
 
-  // Add the polygon visualization if geometry exists
   if (alert.polygon) {
     addAlertPolygon(mapInstance, alert);
-  } else if (alert.counties && alert.counties.length > 0) {
-    // Add county-based visualization if no polygon
+  } else if (
+    (alert.ugc && alert.ugc.length > 0) ||
+    (alert.geocode && alert.geocode.SAME && alert.geocode.SAME.length > 0)
+  ) {
     addAlertCounties(alert);
   }
 
-  // Update the alerts button
   updateAlertsButton();
+}
+
+// Try to synthesize threat information when the alert doesn't include
+// a structured `threats` object. This pulls useful bits from available
+// fields and the raw product text so the threats panel isn't empty.
+function synthesizeThreats(alert) {
+  if (!alert) return {};
+  // Start with any explicit threats (we'll augment missing pieces)
+  const out =
+    alert.threats && Object.keys(alert.threats).length
+      ? Object.assign({}, alert.threats)
+      : {};
+
+  // Look for tornado indicators (including POSSIBLE for SV warnings)
+  try {
+    const rt = alert.rawText || "";
+    const hazards = (alert.hazards || "") + " " + (alert.impact || "");
+
+    let tornadoMatch =
+      /TORNADO\.\.\.\s*(OBSERVED|RADAR INDICATED|RADAR|POSSIBLE)/i.exec(rt) ||
+      null;
+    if (!tornadoMatch) {
+      tornadoMatch =
+        /TORNADO\s*(OBSERVED|RADAR INDICATED|POSSIBLE)?/i.exec(rt) ||
+        /TORNADO/i.exec(hazards) ||
+        null;
+    }
+    if (tornadoMatch) {
+      const detected = (tornadoMatch[1] || "Observed/Indicated").trim();
+      out.tornadoDetection = detected;
+      // keep legacy key too
+      if (!out.tornado) out.tornado = detected;
+    } else {
+      // If this is a Severe Thunderstorm warning, look for 'tornado possible'
+      if (
+        (alert.eventCode && alert.eventCode.startsWith("SV")) ||
+        /Severe Thunderstorm Warning/i.test(alert.eventName || "")
+      ) {
+        if (
+          /TORNADO\s*POSSIBLE/i.test(rt) ||
+          /TORNADO\s*POSSIBLE/i.test(hazards)
+        ) {
+          out.tornadoDetection = "POSSIBLE";
+          if (!out.tornado) out.tornado = "POSSIBLE";
+        }
+      }
+    }
+
+    const damageMatch =
+      /TORNADO DAMAGE THREAT\.{3}\s*([A-Z0-9 _-]+)/i.exec(rt) ||
+      /TORNADO DAMAGE THREAT\.{3}\s*([A-Z0-9 _-]+)/i.exec(hazards);
+    if (damageMatch) out.tornadoDamageThreat = damageMatch[1].trim();
+
+    const hailMatch =
+      /MAX HAIL SIZE\.{3}\s*([0-9]+\.?[0-9]*\s*IN)/i.exec(rt) ||
+      /MAX HAIL SIZE\.{3}\s*([0-9]+\.?[0-9]*\s*IN)/i.exec(hazards);
+    if (hailMatch) out.hail = hailMatch[1].trim();
+
+    const hailAlt = alert.maxHailSize || alert.threats?.maxHailSize;
+    if (hailAlt && !out.hail) out.hail = hailAlt;
+
+    const windAlt =
+      alert.threats?.wind ||
+      /WIND\.{3}\s*([^\n]+)/i.exec(rt)?.[1] ||
+      alert.source;
+    if (windAlt) out.wind = windAlt;
+
+    if (alert.hazards && !out.hazards) out.hazards = alert.hazards;
+    if (alert.source && !out.source) out.source = alert.source;
+
+    // Use generic impact text if hazards empty
+    if ((!out.hazards || out.hazards.trim() === "") && alert.impact)
+      out.hazards = alert.impact;
+  } catch (err) {
+    console.warn("synthesizeThreats error:", err);
+  }
+
+  return out;
 }
 
 function removeAlertFromMap(alertId) {
   const alert = activeAlerts.get(alertId);
   if (!alert) return;
 
-  // Remove from our collection
   activeAlerts.delete(alertId);
 
-  // If this was the selected alert, remove the details panel
   if (selectedAlert && selectedAlert.id === alertId && alertDetailsElement) {
     alertDetailsElement.remove();
     alertDetailsElement = null;
     selectedAlert = null;
   }
 
-  // Remove the marker if it exists
   if (alert.marker) {
     alert.marker.remove();
   }
 
-  // Remove the polygon layers if they exist
-  if (mapInstance.getLayer(`alert-fill-${alertId}`)) {
-    mapInstance.removeLayer(`alert-fill-${alertId}`);
+  if (mapInstance.getLayer(`alert-${alertId}-fill`)) {
+    mapInstance.removeLayer(`alert-${alertId}-fill`);
   }
 
-  if (mapInstance.getLayer(`alert-line-${alertId}`)) {
-    mapInstance.removeLayer(`alert-line-${alertId}`);
+  if (mapInstance.getLayer(`alert-${alertId}-outline-inner`)) {
+    mapInstance.removeLayer(`alert-${alertId}-outline-inner`);
   }
 
-  // Remove the source if it exists
+  if (mapInstance.getLayer(`alert-${alertId}-outline-outer`)) {
+    mapInstance.removeLayer(`alert-${alertId}-outline-outer`);
+  }
+
   if (mapInstance.getSource(`alert-${alertId}`)) {
     mapInstance.removeSource(`alert-${alertId}`);
   }
 
-  // Update the alerts button
+  if (selectedAlert && selectedAlert.id === alertId) {
+    const alertToReset = selectedAlert;
+    selectedAlert = null;
+    stopAlertFlashing(alertToReset);
+  }
+
   updateAlertsButton();
 }
 
-// Initialize the alerts button when the map is ready
+function startAlertFlashing() {
+  if (!enableAlertFlashing || alertFlashInterval || !selectedAlert) return;
+
+  const alert = selectedAlert;
+  if (!mapInstance || !alert.mapLayerId) return;
+
+  if (alert.isCountyBased) return;
+
+  const innerOutlineId = `${alert.mapLayerId}-outline-inner`;
+  const outerOutlineId = `${alert.mapLayerId}-outline-outer`;
+
+  if (!mapInstance.getLayer(innerOutlineId)) return;
+
+  let flashState = false;
+  let currentOpacity = ALERT_OUTLINE_CONFIG.innerOpacity;
+
+  alertFlashInterval = setInterval(() => {
+    flashState = !flashState;
+
+    if (flashMode === "smooth") {
+      const innerOpacity = flashState ? 0.0 : ALERT_OUTLINE_CONFIG.innerOpacity;
+      const outerOpacity = flashState ? 1.0 : 0.6;
+
+      mapInstance.setPaintProperty(
+        innerOutlineId,
+        "line-opacity",
+        innerOpacity
+      );
+      mapInstance.setPaintProperty(
+        outerOutlineId,
+        "line-opacity",
+        outerOpacity
+      );
+    } else if (flashMode === "hard") {
+      const innerOpacity = flashState ? 0.0 : ALERT_OUTLINE_CONFIG.innerOpacity;
+      const outerOpacity = flashState ? 1.0 : 0.6;
+      const innerWidth = ALERT_OUTLINE_CONFIG.innerWidth;
+      const outerWidth = flashState
+        ? ALERT_OUTLINE_CONFIG.outerWidth + 2
+        : ALERT_OUTLINE_CONFIG.outerWidth;
+
+      mapInstance.setPaintProperty(
+        innerOutlineId,
+        "line-opacity",
+        innerOpacity
+      );
+      mapInstance.setPaintProperty(
+        outerOutlineId,
+        "line-opacity",
+        outerOpacity
+      );
+      mapInstance.setPaintProperty(innerOutlineId, "line-width", innerWidth);
+      mapInstance.setPaintProperty(outerOutlineId, "line-width", outerWidth);
+    }
+  }, flashSpeed);
+}
+
+function stopAlertFlashing(alertToReset = selectedAlert) {
+  if (alertFlashInterval) {
+    clearInterval(alertFlashInterval);
+    alertFlashInterval = null;
+  }
+
+  if (
+    alertToReset &&
+    alertToReset.mapLayerId &&
+    mapInstance &&
+    !alertToReset.isCountyBased
+  ) {
+    const innerOutlineId = `${alertToReset.mapLayerId}-outline-inner`;
+    const outerOutlineId = `${alertToReset.mapLayerId}-outline-outer`;
+
+    if (mapInstance.getLayer(innerOutlineId)) {
+      mapInstance.setPaintProperty(
+        innerOutlineId,
+        "line-opacity",
+        ALERT_OUTLINE_CONFIG.innerOpacity
+      );
+      mapInstance.setPaintProperty(
+        innerOutlineId,
+        "line-width",
+        ALERT_OUTLINE_CONFIG.innerWidth
+      );
+    }
+
+    if (mapInstance.getLayer(outerOutlineId)) {
+      mapInstance.setPaintProperty(
+        outerOutlineId,
+        "line-opacity",
+        ALERT_OUTLINE_CONFIG.outerOpacity
+      );
+      mapInstance.setPaintProperty(
+        outerOutlineId,
+        "line-width",
+        ALERT_OUTLINE_CONFIG.outerWidth
+      );
+    }
+  }
+}
+
 function initializeWeatherAlerts() {
-  // Add CSS for alert markers
   const style = document.createElement("style");
   style.textContent = `
     .alert-marker {
@@ -789,97 +1447,261 @@ function initializeWeatherAlerts() {
   `;
   document.head.appendChild(style);
 
-  // Create the alerts button
   createAlertsToggleButton();
+
+  startAlertFlashing();
 }
 
 const enhancedStyles = `
   :root {
-    --glass-bg: rgba(15, 23, 42, 0.85);
-    --glass-border: rgba(255, 255, 255, 0.1);
-    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-    --accent-glow: rgba(56, 189, 248, 0.3);
+    --glass-bg: rgba(10, 15, 30, 0.9);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-shadow: 0 20px 50px rgba(2, 6, 23, 0.75);
+    --accent-glow: rgba(59, 130, 246, 0.4);
     --text-primary: rgba(255, 255, 255, 0.95);
-    --text-secondary: rgba(255, 255, 255, 0.7);
+    --text-secondary: rgba(226, 232, 240, 0.6);
+    --panel-gradient: linear-gradient(145deg, rgba(30, 64, 175, 0.6), rgba(59, 130, 246, 0.35));
   }
 
   .glass-morphism {
     background: var(--glass-bg);
-    backdrop-filter: blur(12px) saturate(180%);
+    backdrop-filter: blur(18px) saturate(180%);
     border: 1px solid var(--glass-border);
     box-shadow: var(--glass-shadow);
-    border-radius: 16px;
+    border-radius: 18px;
   }
 
   .alert-dropdown {
-    position: fixed; /* Changed to fixed for better positioning */
-    min-width: 320px;
+    position: fixed;
+    top: 80px;
+    right: 30px;
+    min-width: 340px;
     max-width: 400px;
-    padding: 16px;
+    padding: 18px;
     color: var(--text-primary);
-    animation: fadeIn 0.2s ease-out;
-    z-index: 1000;
+    animation: fadeIn 0.25s ease-out;
+    z-index: 1100;
   }
 
   .alert-item {
-    padding: 12px;
-    margin: 4px 0;
-    border-radius: 8px;
-    transition: all 0.2s ease;
-    border: 1px solid transparent;
+    padding: 14px;
+    margin: 6px 0;
+    border-radius: 12px;
+    transition: all 0.25s ease;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.03);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .alert-item::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--panel-gradient);
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
+
+  .alert-item > * {
+    position: relative;
   }
 
   .alert-item:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: var(--glass-border);
-    transform: translateY(-1px);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 35px rgba(15, 23, 42, 0.5);
+  }
+
+  .alert-item:hover::before {
+    opacity: 0.3;
+  }
+
+  #alert-detail {
+    animation: panelSlideIn 0.35s cubic-bezier(0.16, 0.68, 0.43, 0.99);
   }
 
   .alert-detail {
     position: fixed;
-    bottom: 32px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 90%;
-    max-width: 800px;
-    padding: 24px;
-    color: var(--text-primary);
-    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    top: 30px;
+    right: 30px;
+    width: 380px;
+    max-height: calc(100vh - 60px);
+    background: rgba(3, 7, 18, 0.92);
+    border-radius: 20px;
+    overflow: hidden;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    box-shadow: 0 25px 80px rgba(2, 6, 23, 0.8);
+    backdrop-filter: blur(22px);
+    color: #f9fafb;
+    z-index: 1200;
+    display: flex;
+    flex-direction: column;
   }
 
-  .alert-header {
-    font-size: 1.5rem;
-    font-weight: 600;
-    margin-bottom: 20px;
-    padding-bottom: 16px;
-    border-bottom: 1px solid var(--glass-border);
+  .alert-detail__header {
+    padding: 22px 22px 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: radial-gradient(circle at top right, rgba(59, 130, 246, 0.35), transparent);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   }
 
-  .alert-content {
+  .alert-detail__header-icon {
+    width: 54px;
+    height: 54px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.08);
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 24px;
+    place-items: center;
+    font-size: 26px;
+    animation: pulseRing 2.4s ease-out infinite;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 0 20px var(--accent-glow);
   }
 
-  .alert-section {
-    background: rgba(255, 255, 255, 0.05);
-    padding: 16px;
-    border-radius: 12px;
+  .alert-detail__header-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .alert-detail__eyebrow {
+    margin: 0;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.35em;
+    opacity: 0.75;
+  }
+
+  .alert-detail__title {
+    margin: 6px 0 0;
+    font-size: 1.35rem;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .alert-detail__meta {
+    margin: 6px 0 0;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+  }
+
+  .alert-detail__close {
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    color: #fff;
+    cursor: pointer;
+    font-size: 18px;
+    display: grid;
+    place-items: center;
+    transition: all 0.2s ease;
+  }
+
+  .alert-detail__close:hover {
+    background: rgba(248, 250, 252, 0.08);
+  }
+
+  .alert-detail__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 12px 22px 16px;
+  }
+
+  .alert-detail__chip {
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    background: rgba(148, 163, 184, 0.12);
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .alert-detail__section {
+    padding: 18px 22px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+    font-size: 0.95rem;
+    line-height: 1.6;
+  }
+
+  .alert-detail__section-title {
+    margin: 0 0 10px;
+    font-size: 0.78rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+  }
+
+  .alert-detail__section strong {
+    display: block;
+    margin-top: 6px;
+    font-size: 1rem;
+    color: var(--text-primary);
+  }
+
+  .alert-detail__section span {
+    display: block;
+    margin-top: 2px;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+  }
+
+  .alert-detail__actions {
+    display: flex;
+    gap: 12px;
+    padding: 18px 22px 22px;
+    background: rgba(2, 6, 23, 0.9);
+  }
+
+  .alert-detail__action {
+    flex: 1;
+    border: none;
+    border-radius: 14px;
+    padding: 12px 16px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+  }
+
+  .alert-detail__action.primary {
+    background: linear-gradient(135deg, #f43f5e, #fb7185);
+    color: #fff;
+    box-shadow: 0 12px 30px rgba(244, 63, 94, 0.4);
+  }
+
+  .alert-detail__action.secondary {
+    background: rgba(15, 23, 42, 0.85);
+    color: #fff;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+  }
+
+  .alert-detail__action:hover {
+    transform: translateY(-2px);
+    opacity: 0.92;
   }
 
   @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-10px); }
+    from { opacity: 0; transform: translateY(-8px); }
     to { opacity: 1; transform: translateY(0); }
   }
 
-  @keyframes slideUp {
-    from { transform: translate(-50%, 100%); opacity: 0; }
-    to { transform: translate(-50%, 0); opacity: 1; }
+  @keyframes panelSlideIn {
+    from { opacity: 0; transform: translate(40px, -20px) scale(0.96); }
+    to { opacity: 1; transform: translate(0, 0) scale(1); }
+  }
+
+  @keyframes pulseRing {
+    0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.35); }
+    70% { box-shadow: 0 0 0 18px rgba(59, 130, 246, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
   }
 `;
 
-//ALERT POLYGON GENERATION AND HANDLING
-// Validate coords: lon between -180 and 180, lat between -90 and 90
 function isValidCoordinate(coord) {
   const [lon, lat] = coord;
   return (
@@ -892,19 +1714,73 @@ function isValidCoordinate(coord) {
   );
 }
 
+function getAlertLayerAnchorId(map) {
+  if (!map || typeof map.getStyle !== "function") return null;
+  const style = map.getStyle();
+  if (!style || !Array.isArray(style.layers)) return null;
+
+  return (
+    style.layers.find(
+      (layer) =>
+        layer.type === "symbol" ||
+        (layer.type === "line" &&
+          (layer.id.includes("Road") ||
+            layer.id.includes("Transit") ||
+            layer.id.includes("Path") ||
+            layer.id.includes("Railway")))
+    )?.id || null
+  );
+}
+
+function ensureAlertOutlinesAboveRadar(
+  alertIds = null,
+  targetMap = mapInstance
+) {
+  if (
+    !targetMap ||
+    typeof targetMap.getLayer !== "function" ||
+    typeof targetMap.moveLayer !== "function"
+  ) {
+    return;
+  }
+  if (!targetMap.getLayer(radarLayerId)) return;
+
+  const anchorLayerId = getAlertLayerAnchorId(targetMap);
+  if (!anchorLayerId) return;
+
+  const fallbackIds =
+    typeof activeAlerts !== "undefined" && activeAlerts instanceof Map
+      ? Array.from(activeAlerts.keys())
+      : [];
+  const idsToProcess =
+    Array.isArray(alertIds) && alertIds.length > 0 ? alertIds : fallbackIds;
+
+  idsToProcess.forEach((alertId) => {
+    if (alertId === undefined || alertId === null) return;
+    const id = `alert-${alertId}`;
+    const outerId = `${id}-outline-outer`;
+    const innerId = `${id}-outline-inner`;
+
+    if (targetMap.getLayer(outerId)) {
+      targetMap.moveLayer(outerId, anchorLayerId);
+    }
+    if (targetMap.getLayer(innerId)) {
+      targetMap.moveLayer(innerId, anchorLayerId);
+    }
+  });
+}
+
 function addAlertPolygon(map, alert) {
   if (!map || !alert.polygon) return;
 
   const id = `alert-${alert.id}`;
-  const color = getAlertColor(alert.eventCode);
+  const color = getAlertColor(alert);
 
-  // Fix coordinate order and validate
   const fixedPolygon = {
     type: "Polygon",
     coordinates: alert.polygon.coordinates.map((ring) =>
       ring
         .map((coord) => {
-          // Swap lat/lon => lon/lat, assuming alert.polygon is [lat, lon]
           const fixed = [coord[1], coord[0]];
           if (!isValidCoordinate(fixed)) {
             console.warn(`Invalid coordinate in alert ${alert.id}:`, coord);
@@ -916,7 +1792,6 @@ function addAlertPolygon(map, alert) {
     ),
   };
 
-  // Make sure polygon ring has at least 3 valid points
   if (
     fixedPolygon.coordinates.length === 0 ||
     fixedPolygon.coordinates[0].length < 3
@@ -927,9 +1802,13 @@ function addAlertPolygon(map, alert) {
     return;
   }
 
-  // Remove existing source and layers to prevent duplicates
-  if (map.getLayer(`${id}-glow`)) map.removeLayer(`${id}-glow`);
-  if (map.getLayer(id)) map.removeLayer(id);
+  alert.areaGeometry = fixedPolygon;
+
+  if (map.getLayer(`${id}-fill`)) map.removeLayer(`${id}-fill`);
+  if (map.getLayer(`${id}-outline-inner`))
+    map.removeLayer(`${id}-outline-inner`);
+  if (map.getLayer(`${id}-outline-outer`))
+    map.removeLayer(`${id}-outline-outer`);
   if (map.getSource(id)) map.removeSource(id);
 
   map.addSource(id, {
@@ -937,580 +1816,1089 @@ function addAlertPolygon(map, alert) {
     data: {
       type: "Feature",
       geometry: fixedPolygon,
-      properties: { id: id },
+      properties: {
+        id: id,
+        eventCode: alert.eventCode,
+      },
     },
   });
 
-  // Glow layer
-  map.addLayer({
-    id: `${id}-glow`,
-    type: "line",
-    source: id,
-    paint: {
-      "line-color": color,
-      "line-width": 12,
-      "line-blur": 8,
-      "line-opacity": 0.4,
-    },
-  });
+  const radarExists = map.getLayer(radarLayerId);
+  const alertLayerAnchorId = getAlertLayerAnchorId(map);
 
-  // Main polygon outline layer
-  map.addLayer({
-    id: id,
-    type: "line",
-    source: id,
-    paint: {
-      "line-color": color,
-      "line-width": 3,
-      "line-opacity": 0.8,
-    },
-  });
+  if (radarExists) {
+    map.addLayer(
+      {
+        id: `${id}-fill`,
+        type: "fill",
+        source: id,
+        paint: {
+          "fill-color": color,
+          "fill-opacity": ALERT_OUTLINE_CONFIG.fillOpacity,
+        },
+      },
+      radarLayerId
+    );
+  } else if (alertLayerAnchorId) {
+    map.addLayer(
+      {
+        id: `${id}-fill`,
+        type: "fill",
+        source: id,
+        paint: {
+          "fill-color": color,
+          "fill-opacity": ALERT_OUTLINE_CONFIG.fillOpacity,
+        },
+      },
+      alertLayerAnchorId
+    );
+  } else {
+    map.addLayer({
+      id: `${id}-fill`,
+      type: "fill",
+      source: id,
+      paint: {
+        "fill-color": color,
+        "fill-opacity": ALERT_OUTLINE_CONFIG.fillOpacity,
+      },
+    });
+  }
 
-  // Click handler for the polygon
-  map.on("click", id, (e) => handleAlertClick(e, alert));
+  if (alertLayerAnchorId) {
+    map.addLayer(
+      {
+        id: `${id}-outline-outer`,
+        type: "line",
+        source: id,
+        paint: {
+          "line-color": ALERT_OUTLINE_CONFIG.outerColor,
+          "line-width": ALERT_OUTLINE_CONFIG.outerWidth,
+          "line-opacity": ALERT_OUTLINE_CONFIG.outerOpacity,
+        },
+        layout: {
+          "line-join": "round",
+          "line-cap": "round",
+        },
+      },
+      alertLayerAnchorId
+    );
+  } else {
+    map.addLayer({
+      id: `${id}-outline-outer`,
+      type: "line",
+      source: id,
+      paint: {
+        "line-color": ALERT_OUTLINE_CONFIG.outerColor,
+        "line-width": ALERT_OUTLINE_CONFIG.outerWidth,
+        "line-opacity": ALERT_OUTLINE_CONFIG.outerOpacity,
+      },
+      layout: {
+        "line-join": "round",
+        "line-cap": "round",
+      },
+    });
+  }
+
+  if (alertLayerAnchorId) {
+    map.addLayer(
+      {
+        id: `${id}-outline-inner`,
+        type: "line",
+        source: id,
+        paint: {
+          "line-color": ALERT_OUTLINE_CONFIG.innerColor(color),
+          "line-width": ALERT_OUTLINE_CONFIG.innerWidth,
+          "line-opacity": ALERT_OUTLINE_CONFIG.innerOpacity,
+        },
+        layout: {
+          "line-join": "round",
+          "line-cap": "round",
+        },
+      },
+      alertLayerAnchorId
+    );
+  } else {
+    map.addLayer({
+      id: `${id}-outline-inner`,
+      type: "line",
+      source: id,
+      paint: {
+        "line-color": ALERT_OUTLINE_CONFIG.innerColor(color),
+        "line-width": ALERT_OUTLINE_CONFIG.innerWidth,
+        "line-opacity": ALERT_OUTLINE_CONFIG.innerOpacity,
+      },
+      layout: {
+        "line-join": "round",
+        "line-cap": "round",
+      },
+    });
+  }
+
+  alert.mapLayerId = id;
+
+  ensureAlertOutlinesAboveRadar([alert.id], map);
+
+  map.on("click", `${id}-fill`, (e) => handleAlertClick(e, alert));
 }
 
-// Handle clicks on the map to show alerts in the area
+function handleAlertClick(e, alert) {
+  e.originalEvent.stopPropagation();
+
+  const previousSelection = selectedAlert;
+  selectedAlert = alert;
+
+  stopAlertFlashing(previousSelection);
+  startAlertFlashing();
+}
+
 function handleMapClick(e) {
-  const point = [e.lngLat.lng, e.lngLat.lat];
-  const alertsInArea = [];
-
-  activeAlerts.forEach((alert) => {
-    if (!alert.polygon) return;
-
-    // Create a fixed polygon with correct coordinate order
-    const fixedPolygon = {
-      type: "Polygon",
-      coordinates: alert.polygon.coordinates.map(
-        (ring) => ring.map((coord) => [coord[1], coord[0]]) // Swap lat/lon to lon/lat
-      ),
-    };
-
-    try {
-      if (turf.booleanPointInPolygon(point, fixedPolygon)) {
-        alertsInArea.push(alert);
-      }
-    } catch (error) {
-      console.error("Error checking point in polygon:", error);
-    }
+  const features = mapInstance.queryRenderedFeatures(e.point, {
+    layers: ["radar-sites-layer"],
   });
 
+  if (features && features.length > 0) {
+    return;
+  }
+
+  const alertsInArea = getAlertsAtPoint(e.lngLat);
+
+  showCoordinateMarker(e.lngLat);
+
   if (alertsInArea.length > 0) {
-    showAlertDropdown(e.point, alertsInArea);
+    showAlertDropdown(e.point, alertsInArea, e.lngLat);
+  } else {
+    showCoordinatePrompt(e.point, e.lngLat);
   }
 }
 
-// Create and show the alert dropdown menu
-function showAlertDropdown(point, alerts) {
+function handleMapPointerDown(e) {
+  if (e.originalEvent && e.originalEvent.target) {
+    const target = e.originalEvent.target;
+    if (
+      target.closest &&
+      target.closest(".alert-dropdown, #alert-detail, .coord-copy-card")
+    ) {
+      return;
+    }
+  }
+
+  cancelMapLongPress();
+
+  const features = mapInstance.queryRenderedFeatures(e.point, {
+    layers: ["radar-sites-layer"],
+  });
+
+  if (features && features.length > 0) {
+    return;
+  }
+
+  const alertsInArea = getAlertsAtPoint(e.lngLat);
+
+  if (alertsInArea.length > 0) {
+    showCoordinateMarker(e.lngLat);
+    showAlertDropdown(e.point, alertsInArea, e.lngLat);
+    return;
+  }
+
+  longPressStartPoint = e.point;
+  longPressTimer = setTimeout(() => handleMapLongPress(e), LONG_PRESS_MS);
+}
+
+function handleMapPointerMove(e) {
+  if (!longPressStartPoint) return;
+  const dx = e.point.x - longPressStartPoint.x;
+  const dy = e.point.y - longPressStartPoint.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist > LONG_PRESS_MOVE_TOLERANCE) {
+    cancelMapLongPress();
+  }
+}
+
+function cancelMapLongPress() {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
+  longPressStartPoint = null;
+}
+
+function handleMapLongPress(e) {
+  if (!longPressTimer) return;
+  longPressTimer = null;
+  longPressStartPoint = null;
+  handleMapClick(e);
+}
+
+function formatLngLat(lngLat) {
+  return `${lngLat.lng.toFixed(4)}, ${lngLat.lat.toFixed(4)}`;
+}
+
+function copyCoordinatesToClipboard(lngLat) {
+  const text = `${lngLat.lat.toFixed(6)}, ${lngLat.lng.toFixed(6)}`;
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).catch((err) => {
+      console.error("Clipboard write failed", err);
+    });
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  document.body.appendChild(textarea);
+  textarea.select();
+  try {
+    document.execCommand("copy");
+  } catch (err) {
+    console.error("Clipboard copy failed", err);
+  }
+  document.body.removeChild(textarea);
+}
+
+function ensureCoordPromptStyles() {
+  if (document.getElementById("coord-prompt-style")) return;
+  const style = document.createElement("style");
+  style.id = "coord-prompt-style";
+  style.textContent = `
+    .coord-btn {
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(8,12,20,0.8);
+      color: #d7dff2;
+      border-radius: 12px;
+      padding: 8px 14px;
+      cursor: pointer;
+      transition: border 0.2s ease, background 0.2s ease, transform 0.2s ease;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+    }
+    .coord-btn.primary {
+      background: linear-gradient(120deg, #42c9ff, #2f7dff);
+      border-color: rgba(66,201,255,0.4);
+      color: #04121f;
+      box-shadow: 0 12px 26px rgba(22,33,66,0.55);
+    }
+    .coord-btn.ghost {
+      background: transparent;
+      color: #939ab7;
+    }
+    .coord-btn:hover { transform: translateY(-1px); border-color: rgba(255,255,255,0.2); }
+    .coord-btn:active { transform: translateY(0); }
+  `;
+  document.head.appendChild(style);
+}
+
+function showCoordinateMarker(lngLat) {
+  if (!mapInstance) return;
+
+  if (!coordinatePromptMarker) {
+    const markerEl = document.createElement("div");
+    markerEl.style.width = "16px";
+    markerEl.style.height = "16px";
+    markerEl.style.borderRadius = "50%";
+    markerEl.style.border = "2px solid #fff";
+    markerEl.style.boxShadow = "0 0 12px rgba(0,0,0,0.6)";
+    markerEl.style.background = "#0f172a";
+    markerEl.style.position = "relative";
+
+    const inner = document.createElement("div");
+    inner.style.position = "absolute";
+    inner.style.top = "50%";
+    inner.style.left = "50%";
+    inner.style.transform = "translate(-50%, -50%)";
+    inner.style.width = "6px";
+    inner.style.height = "6px";
+    inner.style.borderRadius = "50%";
+    inner.style.background = "#38bdf8";
+    inner.style.boxShadow = "0 0 10px rgba(56,189,248,0.8)";
+    markerEl.appendChild(inner);
+
+    coordinatePromptMarker = new maplibregl.Marker({
+      element: markerEl,
+      anchor: "center",
+    });
+  }
+
+  coordinatePromptMarker.setLngLat(lngLat).addTo(mapInstance);
+}
+
+function showCoordinatePrompt(screenPoint, lngLat) {
+  ensureCoordPromptStyles();
+
+  if (coordinatePromptCard) {
+    coordinatePromptCard.remove();
+    coordinatePromptCard = null;
+  }
+
+  const existingDropdown = document.getElementById("alert-dropdown");
+  if (existingDropdown) existingDropdown.remove();
+
+  const card = document.createElement("div");
+  card.className = "coord-copy-card";
+  Object.assign(card.style, {
+    position: "fixed",
+    left: `${screenPoint.x + 12}px`,
+    top: `${screenPoint.y - 12}px`,
+    transform: "translate(-35%, -110%)",
+    background: "rgba(6, 9, 16, 0.96)",
+    border: "1px solid rgba(255,255,255,0.06)",
+    boxShadow: "0 24px 48px rgba(3,5,10,0.65)",
+    borderRadius: "18px",
+    padding: "18px",
+    color: "#f4f6ff",
+    zIndex: 12000,
+    minWidth: "240px",
+    backdropFilter: "blur(18px)",
+    fontFamily: "'Space Grotesk', 'IBM Plex Sans', sans-serif",
+  });
+
+  card.innerHTML = `
+    <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:14px;">
+      <span style="font-size:11px; letter-spacing:0.25em; color:#6c7388;">LAT / LON</span>
+      <strong style="font-size:1rem; font-weight:600;">${formatLngLat(
+        lngLat
+      )}</strong>
+      <span style="font-size:12px; color:#8d93a5;">Long-press anywhere to drop a marker.</span>
+    </div>
+    <div style="display:flex; gap:10px; justify-content:flex-end;">
+      <button class="coord-btn ghost">No</button>
+      <button class="coord-btn primary">Copy</button>
+    </div>
+  `;
+
+  document.body.appendChild(card);
+  coordinatePromptCard = card;
+
+  const [noBtn, yesBtn] = card.querySelectorAll(".coord-btn");
+  noBtn.onclick = () => {
+    card.remove();
+    coordinatePromptCard = null;
+  };
+  yesBtn.onclick = () => {
+    copyCoordinatesToClipboard(lngLat);
+    card.remove();
+    coordinatePromptCard = null;
+  };
+}
+
+function ensureAlertGeometry(alert) {
+  if (!alert) return null;
+  if (alert.areaGeometry) return alert.areaGeometry;
+
+  if (alert.polygon?.coordinates?.length) {
+    const normalized = {
+      type: "Polygon",
+      coordinates: alert.polygon.coordinates.map((ring) =>
+        ring
+          .map((coord) => {
+            const fixed = [coord[1], coord[0]];
+            return isValidCoordinate(fixed) ? fixed : null;
+          })
+          .filter(Boolean)
+      ),
+    };
+
+    if (
+      normalized.coordinates.length > 0 &&
+      normalized.coordinates[0].length >= 3
+    ) {
+      alert.areaGeometry = normalized;
+      return normalized;
+    }
+  }
+
+  return null;
+}
+
+function getAlertsAtPoint(lngLat) {
+  if (!lngLat || !turf) return [];
+  if (!activeAlerts || activeAlerts.size === 0) return [];
+
+  const pointFeature = turf.point([lngLat.lng, lngLat.lat]);
+  const alertsInArea = [];
+
+  activeAlerts.forEach((alert) => {
+    const geometry = ensureAlertGeometry(alert);
+    if (!geometry) return;
+
+    try {
+      if (
+        turf.booleanPointInPolygon(pointFeature, {
+          type: "Feature",
+          geometry,
+        })
+      ) {
+        alertsInArea.push(alert);
+      }
+    } catch (error) {
+      console.error("Error checking point in alert geometry:", error);
+    }
+  });
+
+  return alertsInArea;
+}
+
+function findClosestRadarSites(lngLat, count = 2) {
+  if (!lngLat || radarSitesCache.length === 0 || !turf) return [];
+
+  const targetPoint = turf.point([lngLat.lng, lngLat.lat]);
+
+  return radarSitesCache
+    .map((site) => {
+      const sitePoint = turf.point([site.longitude, site.latitude]);
+      const distance = turf.distance(targetPoint, sitePoint, {
+        units: "miles",
+      });
+      return { site, distance };
+    })
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, count);
+}
+
+function showAlertDropdown(point, alerts, clickedLngLat = null) {
   const existing = document.getElementById("alert-dropdown");
   if (existing) existing.remove();
+
+  ensureCoordPromptStyles();
 
   const dropdown = document.createElement("div");
   dropdown.id = "alert-dropdown";
   dropdown.className = "alert-dropdown";
 
-  // Add base styles
   Object.assign(dropdown.style, {
-    position: "absolute",
-    backgroundColor: "white",
-    borderRadius: "8px",
-    boxShadow: "0 2px 10px rgba(0,0,0,0.2)",
-    width: "300px",
-    maxHeight: "400px",
+    position: "fixed",
+    background: "rgba(5, 8, 14, 0.97)",
+    border: "1px solid rgba(255,255,255,0.06)",
+    borderRadius: "20px",
+    boxShadow: "0 30px 60px rgba(2,4,10,0.6)",
+    width: "360px",
+    maxHeight: "520px",
     overflowY: "auto",
-    zIndex: "1000",
-    padding: "12px",
-    border: "1px solid rgba(0,0,0,0.1)",
+    zIndex: "10000",
+    padding: "0",
+    color: "#f6f8ff",
+    fontFamily: "'Space Grotesk', 'IBM Plex Sans', sans-serif",
+    animation: "dropdownFade 0.25s ease",
+    backdropFilter: "blur(24px)",
   });
 
-  // Calculate position
-  const padding = 20;
-  const dropdownWidth = 300;
-  const dropdownHeight = Math.min(400, window.innerHeight - 40);
+  dropdown.style.top = "24px";
+  dropdown.style.right = "24px";
 
-  // Ensure dropdown stays within viewport
-  let left = Math.min(point.x, window.innerWidth - dropdownWidth - padding);
-  left = Math.max(padding, left);
+  const alertCountText = `${alerts.length} alert${
+    alerts.length === 1 ? "" : "s"
+  } in this area`;
+  const timestampLabel = new Date().toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const closestRadarSites = clickedLngLat
+    ? findClosestRadarSites(clickedLngLat, 2)
+    : [];
 
-  let top = point.y + window.scrollY;
-  if (top + dropdownHeight > window.innerHeight) {
-    top = window.innerHeight - dropdownHeight - padding;
-  }
+  let outsideClickHandler = null;
 
-  dropdown.style.left = `${left}px`;
-  dropdown.style.top = `${top}px`;
+  const clearFlashingSelection = () => {
+    if (!selectedAlert) return;
+    stopAlertFlashing(selectedAlert);
+    selectedAlert = null;
+  };
 
-  // Add header
+  const closeDropdown = (preserveSelection = false) => {
+    if (!dropdown.isConnected) return;
+    dropdown.remove();
+    if (outsideClickHandler) {
+      document.removeEventListener("click", outsideClickHandler);
+      outsideClickHandler = null;
+    }
+    if (!preserveSelection) {
+      clearFlashingSelection();
+    }
+  };
+
   const header = document.createElement("div");
   Object.assign(header.style, {
-    borderBottom: "1px solid #eee",
-    paddingBottom: "10px",
-    marginBottom: "10px",
+    padding: "20px 24px",
+    borderBottom: "1px solid rgba(255,255,255,0.06)",
+    borderRadius: "20px 20px 0 0",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "16px",
   });
 
   header.innerHTML = `
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-      <h3 style="margin: 0; font-size: 16px;">Weather Alerts</h3>
-      <div style="font-size: 0.9rem; color: #666;">
-        ${alerts.length} active alert${alerts.length > 1 ? "s" : ""}
-      </div>
+    <div style="flex:1;">
+      <p style="margin:0; font-size:0.75rem; letter-spacing:0.2em; color:#6f768b;">Point sample</p>
+      <h3 style="margin:6px 0 0; font-weight:600; font-size:1.05rem;">${alertCountText}</h3>
+      <span style="font-size:0.8rem; color:#8d93a5;">${timestampLabel} local</span>
     </div>
+    <button style="background: rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:50%; width:36px; height:36px; color:#f6f8ff; font-size:1rem; cursor:pointer;">×</button>
   `;
   dropdown.appendChild(header);
 
-  // Add alerts list
-  const alertsList = document.createElement("div");
-  alertsList.style.marginTop = "8px";
+  header.querySelector("button").onclick = () => closeDropdown();
 
-  alerts.forEach((alert) => {
-    const item = document.createElement("div");
-    item.className = "alert-item";
-    Object.assign(item.style, {
-      padding: "10px",
-      borderRadius: "6px",
-      cursor: "pointer",
-      marginBottom: "8px",
-      transition: "background-color 0.2s",
-      backgroundColor: "#f8f8f8",
+  if (closestRadarSites.length > 0) {
+    const radarSection = document.createElement("div");
+    Object.assign(radarSection.style, {
+      padding: "14px 22px 6px",
+      borderBottom: "1px solid rgba(255,255,255,0.06)",
+      background: "rgba(255,255,255,0.01)",
+      display: "flex",
+      flexDirection: "column",
+      gap: "10px",
     });
 
-    item.innerHTML = `
-      <div style="display: flex; align-items: center; gap: 12px;">
-        <div style="width: 8px; height: 8px; border-radius: 50%; 
-             background: ${getAlertColor(alert.eventCode)}; 
-             box-shadow: 0 0 10px ${getAlertColor(alert.eventCode)}"></div>
-        <div>
-          <div style="font-weight: 500;">${alert.eventName}</div>
-          <div style="font-size: 0.85rem; color: #666;">
-            ${alert.counties[0]}${
-      alert.counties.length > 1 ? ` +${alert.counties.length - 1} more` : ""
-    }
-          </div>
-        </div>
+    radarSection.innerHTML = `
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <p style="margin:0; font-size:0.7rem; letter-spacing:0.3em; color:#6f768b;">CLOSEST RADAR SITES</p>
+        <span style="font-size:0.75rem; color:#8d93a5;">Top ${
+          closestRadarSites.length
+        }</span>
+      </div>
+      ${closestRadarSites
+        .map(
+          ({ site, distance }) => `
+            <div style="display:flex; align-items:center; justify-content:space-between; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); border-radius:12px; padding:10px 12px;">
+              <div>
+                <strong style="display:block; font-size:0.95rem; color:#f6f8ff;">K${
+                  site.id
+                }</strong>
+                <span style="font-size:0.8rem; color:#8d93a5;">${
+                  site.name
+                }</span>
+              </div>
+              <span style="font-size:0.85rem; color:#9ba3bd;">${distance.toFixed(
+                1
+              )} mi</span>
+            </div>
+          `
+        )
+        .join("")}
+    `;
+
+    dropdown.appendChild(radarSection);
+  }
+
+  if (clickedLngLat) {
+    const coordBlock = document.createElement("div");
+    Object.assign(coordBlock.style, {
+      padding: "16px 22px",
+      borderBottom: "1px solid rgba(255,255,255,0.06)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: "12px",
+      background: "rgba(255,255,255,0.01)",
+    });
+
+    coordBlock.innerHTML = `
+      <div>
+        <p style="margin:0; font-size:0.75rem; letter-spacing:0.2em; color:#6f768b;">Map Point</p>
+        <strong style="font-size:0.95rem;">${formatLngLat(
+          clickedLngLat
+        )}</strong>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="coord-btn ghost">Skip</button>
+        <button class="coord-btn primary">Copy</button>
       </div>
     `;
 
-    // Add hover effect
-    item.addEventListener("mouseover", () => {
-      item.style.backgroundColor = "#f0f0f0";
+    dropdown.appendChild(coordBlock);
+
+    const [noBtn, yesBtn] = coordBlock.querySelectorAll(".coord-btn");
+    noBtn.onclick = () => coordBlock.remove();
+    yesBtn.onclick = () => {
+      copyCoordinatesToClipboard(clickedLngLat);
+      coordBlock.remove();
+    };
+  }
+
+  const alertsList = document.createElement("div");
+  alertsList.style.padding = "12px";
+  alertsList.style.display = "flex";
+  alertsList.style.flexDirection = "column";
+  alertsList.style.gap = "8px";
+
+  if (alerts.length === 0) {
+    const emptyState = document.createElement("div");
+    Object.assign(emptyState.style, {
+      padding: "20px",
+      borderRadius: "14px",
+      border: "1px solid rgba(255,255,255,0.05)",
+      background: "rgba(255,255,255,0.01)",
+      color: "#9ba3bd",
+      fontSize: "0.9rem",
+      textAlign: "center",
     });
-    item.addEventListener("mouseout", () => {
-      item.style.backgroundColor = "#f8f8f8";
+    emptyState.textContent = "No active alerts at this point.";
+    alertsList.appendChild(emptyState);
+  }
+
+  alerts.forEach((alert) => {
+    const item = document.createElement("div");
+    item.className = "alert-item-modern";
+    const color = getAlertColor(alert);
+    const hasCounties = alert.counties && alert.counties.length;
+    const countyPrimary = hasCounties ? alert.counties[0] : "Area unspecified";
+    const countySuffix =
+      hasCounties && alert.counties.length > 1
+        ? ` +${alert.counties.length - 1} more`
+        : "";
+
+    Object.assign(item.style, {
+      padding: "16px 18px",
+      borderRadius: "14px",
+      cursor: "pointer",
+      background: "rgba(255, 255, 255, 0.02)",
+      border: "1px solid rgba(255, 255, 255, 0.05)",
+      transition: "border 0.2s ease, transform 0.2s ease, background 0.2s ease",
+    });
+
+    const content = document.createElement("div");
+    content.innerHTML = `
+      <div style="display:flex; align-items:flex-start; gap:12px;">
+        <div style="width:10px; height:10px; border-radius:50%; margin-top:6px; background:${color}; box-shadow:0 0 12px ${color}33;"></div>
+        <div style="flex:1;">
+          <p style="margin:0; font-size:0.75rem; letter-spacing:0.2em; color:#6f768b;">${
+            alert.eventCode || "ALERT"
+          }</p>
+          <strong style="display:block; margin:6px 0; font-size:1rem;">${
+            alert.eventName
+          }</strong>
+          <span style="font-size:0.85rem; color:#a1a7bb;">${countyPrimary}${countySuffix}</span>
+        </div>
+        <span style="font-size:1.2rem; color:#5f6578;">→</span>
+      </div>
+    `;
+    item.appendChild(content);
+
+    item.addEventListener("mouseenter", () => {
+      item.style.background = "rgba(255, 255, 255, 0.05)";
+      item.style.borderColor = color;
+      item.style.transform = "translateX(4px)";
+    });
+
+    item.addEventListener("mouseleave", () => {
+      item.style.background = "rgba(255, 255, 255, 0.02)";
+      item.style.borderColor = "rgba(255, 255, 255, 0.05)";
+      item.style.transform = "translateX(0)";
     });
 
     item.onclick = () => {
+      const previousSelection = selectedAlert;
+      selectedAlert = alert;
+      stopAlertFlashing(previousSelection);
+      startAlertFlashing();
+      closeDropdown(true);
       showDetailedAlert(alert);
-      dropdown.remove();
     };
+
     alertsList.appendChild(item);
   });
 
   dropdown.appendChild(alertsList);
   document.body.appendChild(dropdown);
 
-  // Add close button
-  const closeButton = document.createElement("button");
-  Object.assign(closeButton.style, {
-    position: "absolute",
-    top: "8px",
-    right: "8px",
-    background: "none",
-    border: "none",
-    cursor: "pointer",
-    fontSize: "18px",
-    color: "#666",
-  });
-  closeButton.innerHTML = "×";
-  closeButton.onclick = () => dropdown.remove();
-  dropdown.appendChild(closeButton);
+  outsideClickHandler = (e) => {
+    if (
+      !dropdown.contains(e.target) &&
+      !e.target.closest(".alerts-toggle-btn")
+    ) {
+      closeDropdown();
+    }
+  };
 
-  // Close dropdown when clicking outside
   setTimeout(() => {
-    document.addEventListener(
-      "click",
-      (e) => {
-        if (!dropdown.contains(e.target)) dropdown.remove();
-      },
-      { once: true }
-    );
+    document.addEventListener("click", outsideClickHandler);
   }, 0);
 
-  // Add some basic CSS if not already present
   if (!document.getElementById("alert-dropdown-styles")) {
     const style = document.createElement("style");
     style.id = "alert-dropdown-styles";
     style.textContent = `
-      .alert-dropdown {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      @keyframes dropdownFade {
+        from { opacity: 0; transform: translateY(-12px); }
+        to { opacity: 1; transform: translateY(0); }
       }
-      .alert-item:last-child {
-        margin-bottom: 0;
+      .alert-dropdown::-webkit-scrollbar {
+        width: 6px;
+      }
+      .alert-dropdown::-webkit-scrollbar-thumb {
+        background: rgba(255,255,255,0.08);
+        border-radius: 999px;
+      }
+      .alert-dropdown::-webkit-scrollbar-track {
+        background: transparent;
       }
     `;
     document.head.appendChild(style);
   }
 }
 
-// Show detailed alert information
 function showDetailedAlert(alert) {
   try {
-    const bbox = turf.bbox(alert.polygon);
-    const bounds = [
-      [Math.min(bbox[0], bbox[2]), Math.min(bbox[1], bbox[3])].map((coord) =>
-        parseFloat(coord)
-      ),
-      [Math.max(bbox[0], bbox[2]), Math.max(bbox[1], bbox[3])].map((coord) =>
-        parseFloat(coord)
-      ),
-    ];
+    const polygon = alert.polygon?.coordinates?.length
+      ? {
+          type: "Polygon",
+          coordinates: alert.polygon.coordinates.map((ring) =>
+            ring.map(([lat, lng]) => [lng, lat])
+          ),
+        }
+      : null;
 
-    // Swap coordinates if they're in wrong order (lat, lng instead of lng, lat)
-    if (Math.abs(bounds[0][0]) < 90 && Math.abs(bounds[0][1]) > 90) {
-      bounds.forEach((pair) => {
-        [pair[0], pair[1]] = [pair[1], pair[0]];
-      });
+    if (polygon) {
+      const bbox = turf.bbox(polygon);
+      mapInstance.fitBounds(
+        [
+          [bbox[0], bbox[1]],
+          [bbox[2], bbox[3]],
+        ],
+        { padding: 40, duration: 900, maxZoom: 11 }
+      );
     }
 
-    // Final validation
-    if (
-      bounds[0][0] >= -180 &&
-      bounds[0][0] <= 180 && // west
-      bounds[1][0] >= -180 &&
-      bounds[1][0] <= 180 && // east
-      bounds[0][1] >= -90 &&
-      bounds[0][1] <= 90 && // south
-      bounds[1][1] >= -90 &&
-      bounds[1][1] <= 90 // north
-    ) {
-      mapInstance.fitBounds(bounds, {
-        padding: 50,
-        duration: 1000,
-        maxZoom: 10,
-      });
-    } else {
-      console.error("Invalid bounds:", bounds);
-      // Fallback to first coordinate of polygon
-      const firstCoord = alert.polygon.coordinates[0][0];
-      mapInstance.setCenter([firstCoord[0], firstCoord[1]]);
-      mapInstance.setZoom(8);
-    }
-
-    // Get color based on alert type
-    const color = getAlertColor(alert.eventCode);
+    const color = getAlertColor(alert);
     const icon = getAlertIcon(alert.eventCode);
+    const issued = alert.effective ? formatDate(alert.effective) : "N/A";
+    const expires = alert.expires ? formatDate(alert.expires) : "N/A";
+    const expiringSoon = isExpiringSoon(alert.expires);
 
-    // Format dates
-    const issuedFormatted = alert.effective
-      ? formatDate(alert.effective)
-      : "N/A";
-    const expiresFormatted = alert.expires ? formatDate(alert.expires) : "N/A";
+    const existing = document.getElementById("alert-detail");
+    if (existing) existing.remove();
 
-    // Build threats section
-    let threatsList = buildThreatsList(alert);
+    const panel = document.createElement("div");
+    panel.id = "alert-detail";
+    panel.className = "alert-cinematic";
 
-    // Create detailed alert view with enhanced styling
-    const detailView = document.createElement("div");
-    detailView.id = "alert-detail";
-    detailView.style.cssText = `
-      position: fixed;
-      bottom: 30px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(20, 20, 28, 0.7);
-      border-radius: 18px;
-      padding: 0;
-      color: white;
-      z-index: 1000;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      max-width: 600px;
-      width: 90%;
-      overflow: hidden;
-      animation: fadeIn 0.4s ease-out, floatUp 0.5s ease-out;
-      background-image: 
-        linear-gradient(125deg, rgba(${color.replace(/[^\d,]/g, "")}, 0.08) 0%, 
-        rgba(40, 40, 55, 0.3) 50%, 
-        rgba(20, 20, 28, 0.5) 100%);
-    `;
+    // 🔑 Accent variables (THIS is the magic)
+    panel.style.setProperty("--accent", color);
+    panel.style.setProperty("--accent-glass", `${color}22`);
+    panel.style.setProperty("--accent-soft", `${color}14`);
 
-    // Add keyframe animations to head
-    const style = document.createElement("style");
-    style.textContent = `
-      @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-      }
-      @keyframes floatUp {
-        from { transform: translateX(-50%) translateY(20px); }
-        to { transform: translateX(-50%) translateY(0); }
-      }
-      @keyframes pulse {
-        0% { box-shadow: 0 0 0 0 rgba(${color.replace(/[^\d,]/g, "")}, 0.7); }
-        70% { box-shadow: 0 0 0 10px rgba(${color.replace(/[^\d,]/g, "")}, 0); }
-        100% { box-shadow: 0 0 0 0 rgba(${color.replace(/[^\d,]/g, "")}, 0); }
-      }
-      @keyframes gradientShift {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
-      }
-    `;
-    document.head.appendChild(style);
-
-    detailView.innerHTML = `
-      <div class="alert-header" style="
-        background: linear-gradient(135deg, ${color} 0%, rgba(${color.replace(
-      /[^\d,]/g,
-      ""
-    )}, 0.7) 100%);
-        background-size: 200% 200%;
-        animation: gradientShift 5s ease infinite;
-        color: white;
-        padding: 20px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-      ">
-        <div style="display: flex; align-items: center; gap: 12px;">
-          <div style="
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-            animation: pulse 2s infinite;
-          ">${icon}</div>
-          <h2 style="margin: 0; font-size: 1.5rem; text-shadow: 0 2px 4px rgba(0,0,0,0.3);">${
-            alert.eventName
-          }</h2>
+    panel.innerHTML = `
+      <header class="alert-cinematic__header">
+        <div class="alert-cinematic__badge">
+          <span>${icon}</span>
+          <small>${alert.eventCode || "ALERT"}</small>
         </div>
-        <button onclick="this.parentElement.parentElement.remove()" style="
-          background: rgba(255, 255, 255, 0.15);
-          border: none;
-          color: white;
-          width: 30px;
-          height: 30px;
-          border-radius: 50%;
+
+        <div class="alert-cinematic__title">
+          <p>${alert.office || "National Weather Service"}</p>
+          <h2>${alert.eventName || "Weather Alert"}</h2>
+          <span>
+            ${alert.counties?.slice(0, 2).join(", ") || "Multiple areas"}
+            ${
+              alert.counties?.length > 2 ? ` +${alert.counties.length - 2}` : ""
+            }
+          </span>
+        </div>
+
+        <button class="alert-cinematic__close">×</button>
+      </header>
+
+      <section class="alert-cinematic__meta">
+        <article>
+          <p>Issued</p>
+          <strong>${issued}</strong>
+        </article>
+        <article class="${expiringSoon ? "alert-soon" : ""}">
+          <p>Expires</p>
+          <strong>${expires}</strong>
+        </article>
+        <article>
+          <p>Severity</p>
+          <strong>${alert.severity || "Unknown"}</strong>
+        </article>
+      </section>
+
+      <section class="alert-cinematic__body">
+        <div>
+          <h4>Threats & Impacts</h4>
+          ${buildThreatsList(alert)}
+        </div>
+
+        <div>
+          <h4>Affected Areas</h4>
+          <p>${alert.counties?.join(", ") || "Not specified"}</p>
+        </div>
+
+        <div>
+          <h4>Summary</h4>
+          <p>${
+            alert.headline || alert.description || "Details unavailable."
+          }</p>
+        </div>
+      </section>
+
+      <footer class="alert-cinematic__actions">
+        <button class="ghost">Focus Polygon</button>
+        <button class="primary">View Full Alert</button>
+      </footer>
+    `;
+
+    document.body.appendChild(panel);
+
+    if (!document.getElementById("alert-cinematic-style")) {
+      const style = document.createElement("style");
+      style.id = "alert-cinematic-style";
+      style.textContent = `
+        @keyframes panelEnter {
+          from { opacity: 0; transform: translateY(14px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        .alert-cinematic {
+          position: fixed;
+          top: 20px;
+          left: 13%;
+          width: 460px;
+          max-height: calc(100vh - 40px);
+          background:
+            linear-gradient(180deg, var(--accent-soft), transparent 40%),
+            rgba(10,15,30,0.92);
+          backdrop-filter: blur(18px) saturate(130%);
+          border: 1px solid rgba(255,255,255,0.08);
+          border-left: 4px solid var(--accent);
+          border-radius: 18px;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.55);
+          color: #e5e7eb;
+          animation: panelEnter 0.35s ease-out;
           display: flex;
+          flex-direction: column;
+          z-index: 1300;
+        }
+
+        .alert-cinematic__header {
+          display: flex;
+          gap: 16px;
+          padding: 20px 22px;
+          background:
+            linear-gradient(90deg, var(--accent-glass), transparent 65%),
+            rgba(15,23,42,0.75);
+          border-bottom: 1px solid rgba(255,255,255,0.06);
+          align-items: center;
+        }
+
+        .alert-cinematic__badge {
+          width: 54px;
+          height: 54px;
+          border-radius: 14px;
+          background:
+            linear-gradient(145deg, var(--accent-glass), rgba(255,255,255,0.03));
+          display: flex;
+          flex-direction: column;
           align-items: center;
           justify-content: center;
-          cursor: pointer;
-          font-size: 16px;
-          transition: all 0.2s ease;
-          backdrop-filter: blur(5px);
-        ">×</button>
-      </div>
-      
-      <div class="alert-body" style="padding: 25px;">
-        <div style="
-          display: flex;
-          justify-content: space-between;
-          margin-bottom: 20px;
-          padding-bottom: 15px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        ">
-          <div style="
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 10px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 12px;
-            width: 48%;
-          ">
-            <span style="font-size: 0.8rem; color: rgba(255, 255, 255, 0.6);">ISSUED</span>
-            <span style="font-weight: 600; margin-top: 5px;">${issuedFormatted}</span>
-          </div>
-          <div style="
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 10px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 12px;
-            width: 48%;
-            ${
-              alert.expires && isExpiringSoon(alert.expires)
-                ? "border: 1px solid rgba(255, 87, 87, 0.5);"
-                : ""
-            }
-          ">
-            <span style="font-size: 0.8rem; color: rgba(255, 255, 255, 0.6);">EXPIRES</span>
-            <span style="font-weight: 600; margin-top: 5px; ${
-              alert.expires && isExpiringSoon(alert.expires)
-                ? "color: #ff5757;"
-                : ""
-            }">${expiresFormatted}</span>
-          </div>
-        </div>
-        
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
-          <div style="
-            background: rgba(255, 255, 255, 0.03);
-            border-radius: 12px;
-            padding: 15px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-          ">
-            <h4 style="
-              margin: 0 0 10px 0;
-              color: ${color};
-              font-size: 1rem;
-              display: flex;
-              align-items: center;
-              gap: 8px;
-            ">
-              <span style="
-                width: 8px;
-                height: 8px;
-                background: ${color};
-                border-radius: 50%;
-                display: inline-block;
-              "></span>
-              Alert Information
-            </h4>
-            <div style="color: rgba(255, 255, 255, 0.8); font-size: 0.9rem;">
-              <p style="margin: 5px 0;">
-                <span style="color: rgba(255, 255, 255, 0.5);">Source:</span> 
-                ${alert.office || "National Weather Service"}
-              </p>
-              <p style="margin: 5px 0;">
-                <span style="color: rgba(255, 255, 255, 0.5);">Event Code:</span> 
-                ${alert.eventCode || "N/A"}
-              </p>
-            </div>
-          </div>
-          
-          <div style="
-            background: rgba(255, 255, 255, 0.03);
-            border-radius: 12px;
-            padding: 15px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-          ">
-            <h4 style="
-              margin: 0 0 10px 0;
-              color: ${color};
-              font-size: 1rem;
-              display: flex;
-              align-items: center;
-              gap: 8px;
-            ">
-              <span style="
-                width: 8px;
-                height: 8px;
-                background: ${color};
-                border-radius: 50%;
-                display: inline-block;
-              "></span>
-              Affected Areas
-            </h4>
-            <div style="
-              color: rgba(255, 255, 255, 0.8);
-              font-size: 0.9rem;
-              max-height: 80px;
-              overflow-y: auto;
-              scrollbar-width: thin;
-              scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
-            ">
-              <p style="margin: 5px 0;">${
-                alert.counties ? alert.counties.join(", ") : "Not specified"
-              }</p>
-            </div>
-          </div>
-        </div>
-        
-        <div style="
-          background: rgba(${color.replace(/[^\d,]/g, "")}, 0.05);
-          border-radius: 12px;
-          padding: 15px;
-          border: 1px solid rgba(${color.replace(/[^\d,]/g, "")}, 0.1);
-          margin-bottom: 20px;
-        ">
-          <h4 style="
-            margin: 0 0 10px 0;
-            color: ${color};
-            font-size: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-          ">
-            <span style="
-              width: 8px;
-              height: 8px;
-              background: ${color};
-              border-radius: 50%;
-              display: inline-block;
-            "></span>
-            Threats & Impacts
-          </h4>
-          <div style="color: rgba(255, 255, 255, 0.8); font-size: 0.9rem;">
-            ${threatsList}
-          </div>
-        </div>
-        
-        <div class="alert-actions" style="
-          display: flex;
-          justify-content: flex-end;
-          margin-top: 15px;
-        ">
-          <button class="view-full-alert" style="
-            background: ${color};
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 500;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            box-shadow: 0 4px 15px rgba(${color.replace(/[^\d,]/g, "")}, 0.3);
-            transition: all 0.2s ease;
-          ">
-            <span>View Full Alert</span>
-            <span>→</span>
-          </button>
-        </div>
-      </div>
-    `;
+        }
 
-    // Remove existing alert detail if present
-    const existingDetail = document.getElementById("alert-detail");
-    if (existingDetail) {
-      existingDetail.remove();
+        .alert-cinematic__badge small {
+          font-size: 0.6rem;
+          opacity: 0.7;
+          letter-spacing: 0.12em;
+        }
+
+        .alert-cinematic__title p {
+          margin: 0;
+          font-size: 0.7rem;
+          letter-spacing: 0.18em;
+          opacity: 0.65;
+          text-transform: uppercase;
+        }
+
+        .alert-cinematic__title h2 {
+          margin: 6px 0;
+          font-size: 1.35rem;
+          font-weight: 600;
+        }
+
+        .alert-cinematic__title span {
+          font-size: 0.85rem;
+          opacity: 0.75;
+        }
+
+        .alert-cinematic__close {
+          margin-left: auto;
+          background: none;
+          border: none;
+          color: #9ca3af;
+          font-size: 1.3rem;
+          cursor: pointer;
+        }
+
+        .alert-cinematic__meta {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 12px;
+          padding: 16px 20px;
+          border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+
+        .alert-cinematic__meta article {
+          background: rgba(255,255,255,0.03);
+          border-radius: 12px;
+          padding: 12px;
+          text-align: center;
+        }
+
+        .alert-cinematic__meta p {
+          font-size: 0.6rem;
+          letter-spacing: 0.18em;
+          opacity: 0.6;
+          text-transform: uppercase;
+          margin: 0;
+        }
+
+        .alert-cinematic__meta strong {
+          display: block;
+          margin-top: 6px;
+          font-size: 0.95rem;
+        }
+
+        .alert-soon {
+          border: 1px solid rgba(239,68,68,0.6);
+        }
+
+        .alert-cinematic__body {
+          padding: 18px 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+          overflow-y: auto;
+        }
+
+        .alert-cinematic__body > div {
+          background: rgba(255,255,255,0.025);
+          border-radius: 14px;
+          padding: 14px;
+        }
+
+        .alert-cinematic__body h4 {
+          font-size: 0.65rem;
+          letter-spacing: 0.18em;
+          opacity: 0.7;
+          text-transform: uppercase;
+          margin-bottom: 6px;
+        }
+
+        .alert-cinematic__actions {
+          display: flex;
+          gap: 12px;
+          padding: 16px 20px 20px;
+        }
+
+        .alert-cinematic__actions button {
+          flex: 1;
+          padding: 12px;
+          border-radius: 12px;
+          border: 1px solid rgba(255,255,255,0.08);
+          background: rgba(255,255,255,0.04);
+          color: #e5e7eb;
+          font-weight: 600;
+          cursor: pointer;
+        }
+
+        .alert-cinematic__actions .primary {
+          background: var(--accent);
+          color: #020617;
+          border: none;
+        }
+      `;
+      document.head.appendChild(style);
     }
 
-    document.body.appendChild(detailView);
-  } catch (error) {
-    console.error("Error in showDetailedAlert:", error);
-    const errorView = document.createElement("div");
-    errorView.style.cssText = `
-      position: fixed;
-      bottom: 30px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(220, 38, 38, 0.9);
-      color: white;
-      padding: 15px 30px;
-      border-radius: 12px;
-      backdrop-filter: blur(10px);
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-      z-index: 1000;
-      animation: slideUp 0.3s ease;
-    `;
-    errorView.textContent =
-      "Unable to display alert details. Please try again.";
-    document.body.appendChild(errorView);
-    setTimeout(() => errorView.remove(), 3000);
+    panel.querySelector(".alert-cinematic__close").onclick = () =>
+      panel.remove();
+
+    panel.querySelector(".ghost").onclick = () => {
+      if (!polygon) return;
+      const bbox = turf.bbox(polygon);
+      mapInstance.fitBounds(
+        [
+          [bbox[0], bbox[1]],
+          [bbox[2], bbox[3]],
+        ],
+        { padding: 40, duration: 800, maxZoom: 11 }
+      );
+    };
+
+    panel.querySelector(".primary").onclick = () =>
+      alert.rawText ? showFullAlertText(alert.rawText) : alert("No text.");
+  } catch (err) {
+    console.error("showDetailedAlert failed:", err);
   }
 }
 
-// Helper function to convert hex to RGB
+
+function buildThreatsList(alert) {
+  const threats =
+    alert.threats && Object.keys(alert.threats).length
+      ? alert.threats
+      : synthesizeThreats(alert);
+
+  if (!threats || Object.keys(threats).length === 0) {
+    // Provide useful fallback text from hazards/impact/precautionaryActions
+    const parts = [];
+    if (alert.hazards) parts.push(alert.hazards);
+    if (alert.impact) parts.push(alert.impact);
+    if (alert.precautionaryActions) parts.push(alert.precautionaryActions);
+    if (parts.length > 0) {
+      return `<p style="opacity: 0.9;">${parts.join(" — ")}</p>`;
+    }
+    return '<p style="opacity: 0.7;">No specific threat information available.</p>';
+  }
+
+  let html = '<ul style="margin: 0; padding-left: 20px; line-height: 1.8;">';
+
+  if (threats.wind) {
+    html += `<li><strong>💨 Wind:</strong> ${threats.wind}</li>`;
+  }
+  if (threats.hail) {
+    html += `<li><strong>🧊 Hail:</strong> ${threats.hail}</li>`;
+  }
+  if (threats.tornado) {
+    html += `<li><strong>🌪️ Tornado:</strong> ${threats.tornado}</li>`;
+  }
+  if (threats.tornadoDetection && !threats.tornado) {
+    html += `<li><strong>🌪️ Detection:</strong> ${threats.tornadoDetection}</li>`;
+  } else if (threats.tornadoDetection && threats.tornado) {
+    html += `<li><strong>🌪️ Detection:</strong> ${threats.tornadoDetection}</li>`;
+  }
+  if (threats.tornadoDamageThreat) {
+    html += `<li><strong>⚠️ Damage Threat:</strong> ${threats.tornadoDamageThreat}</li>`;
+  }
+  if (threats.flooding) {
+    html += `<li><strong>🌊 Flooding:</strong> ${threats.flooding}</li>`;
+  }
+  if (threats.lightning) {
+    html += `<li><strong>⚡ Lightning:</strong> ${threats.lightning}</li>`;
+  }
+
+  if (threats.hazards && !threats.hail && !threats.tornado && !threats.wind) {
+    html += `<li><strong>⚠️ Hazards:</strong> ${threats.hazards}</li>`;
+  }
+
+  // Always show hazards/source if present but keep them subtle to avoid clutter
+  if (threats.hazards && (threats.hail || threats.tornado || threats.wind)) {
+    html += `<li style="opacity:0.92"><strong>⚠️ Hazards:</strong> ${threats.hazards}</li>`;
+  }
+  if (threats.source) {
+    html += `<li style="opacity:0.85"><strong>📡 Source:</strong> ${threats.source}</li>`;
+  }
+
+  html += "</ul>";
+  return html;
+}
+
+function isExpiringSoon(expiresDate) {
+  if (!expiresDate) return false;
+  const expires = new Date(expiresDate);
+  const now = new Date();
+  const hoursUntilExpiry = (expires - now) / (1000 * 60 * 60);
+  return hoursUntilExpiry < 1 && hoursUntilExpiry > 0;
+}
+
 function hexToRgb(hex) {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   return result
@@ -1521,351 +2909,174 @@ function hexToRgb(hex) {
     : "255, 255, 255";
 }
 
-// Add necessary CSS to your stylesheet dynamically
 const styles = `
-  @keyframes slideUp {
-    from { transform: translateX(-50%) translateY(100%); }
-    to { transform: translateX(-50%) translateY(0); }
-  }
 
-  #alert-dropdown {
-    animation: fadeIn 0.2s ease-out;
-  }
-
-  #alert-detail {
-    animation: slideUp 0.3s ease-out;
-  }
 `;
 
 const styleSheet = document.createElement("style");
 styleSheet.textContent = styles;
 document.head.appendChild(styleSheet);
 
-// Initialize the click handler on map load
+function getAlertName(alert) {
+  // Get the full text content for enhanced detection
+  const alertText = alert.description || alert.text || alert.headline || "";
 
-function getAlertColor(eventCodeOrName) {
-  if (!eventCodeOrName) return "#CCCCCC";
+  // Determine base event name
+  let eventName = alert.event || alert.eventName || alert.headline;
 
-  // First check if it's a two-letter event code
-  if (eventCodeOrName.length === 2) {
-    const codeColors = {
-      TO: "#FF0000", // Tornado
-      SV: "#FFA500", // Severe Thunderstorm
-      FF: "#00FF00", // Flash Flood
-      FL: "#00FFFF", // Flood
-      WS: "#0000FF", // Winter Storm
-      WW: "#800080", // Winter Weather
-      HU: "#FFC0CB", // Hurricane
-      TY: "#FFC0CB", // Typhoon
-      TR: "#FFC0CB", // Tropical Storm
-      BZ: "#FFFFFF", // Blizzard
-      HS: "#FFD700", // Heat
-      EH: "#FFD700", // Excessive Heat
-      HW: "#FFD700", // High Wind
-      FW: "#FF4500", // Fire Weather
-      RH: "#DDA0DD", // Radiological Hazard
-      EC: "#FFD700", // Evacuation
-      EVI: "#FFD700", // Evacuation Immediate
-      HMW: "#DDA0DD", // Hazardous Materials Warning
-      NUW: "#DDA0DD", // Nuclear Power Plant Warning
-      SPW: "#DDA0DD", // Shelter in Place Warning
-      VOW: "#DDA0DD", // Volcano Warning
-      AF: "#FF7F50", // Ashfall
-      AVW: "#C0C0C0", // Avalanche Warning
-      CAE: "#800000", // Child Abduction Emergency
-      CDW: "#008080", // Civil Danger Warning
-      CEM: "#008080", // Civil Emergency Message
-      CF: "#DAA520", // Coastal Flood
-      CFW: "#DAA520", // Coastal Flood Warning
-      DSW: "#8B4513", // Dust Storm Warning
-      EQW: "#800000", // Earthquake Warning
-      FRW: "#FF00FF", // Fire Warning
-      HLS: "#000000", // Hurricane Local Statement
-      LEW: "#800000", // Law Enforcement Warning
-      LAE: "#800000", // Local Area Emergency
-      TS: "#808000", // Tsunami
-      TSW: "#808000", // Tsunami Warning
-      SSW: "#FFD700", // Storm Surge Warning
-      TOW: "#FF0000", // Tornado Warning
-      TRW: "#FFC0CB", // Tropical Storm Warning
-      WIW: "#0000FF", // Wind
-      SPS: "#FFD700", // Special Weather Statement
+  if (!eventName && alert.eventCode) {
+    const codeNames = {
+      "TO.W": "Tornado Warning",
+      "SV.W": "Severe Thunderstorm Warning",
+      "FF.W": "Flash Flood Warning",
+      "FL.W": "Flood Warning",
+      "WS.W": "Winter Storm Warning",
+      "BZ.W": "Blizzard Warning",
     };
+    eventName = codeNames[alert.eventCode] || alert.eventCode;
+  }
 
-    if (codeColors[eventCodeOrName]) {
-      return codeColors[eventCodeOrName];
+  if (!eventName) {
+    return "Weather Alert";
+  }
+
+  // Enhanced detection for Tornado Warnings
+  if (eventName.includes("Tornado Warning")) {
+    // Check TORNADO DAMAGE THREAT first (takes precedence)
+    const tornadoDamageMatch = alertText.match(
+      /TORNADO DAMAGE THREAT\.{3}(CONSIDERABLE|CATASTROPHIC)/i
+    );
+    if (tornadoDamageMatch) {
+      const threatLevel = tornadoDamageMatch[1].toUpperCase();
+      if (threatLevel === "CATASTROPHIC") {
+        console.log("🚨 [getAlertName] TORNADO EMERGENCY detected!");
+        return "Tornado Emergency";
+      } else if (threatLevel === "CONSIDERABLE") {
+        console.log("⚠️ [getAlertName] PDS Tornado Warning detected");
+        return "PDS Tornado Warning";
+      }
     }
+    // Only check for OBSERVED if no DAMAGE THREAT was found
+    else if (/TORNADO\.{3}OBSERVED/i.test(alertText)) {
+      console.log("👁️ [getAlertName] Observed Tornado Warning detected");
+      return "Tornado Warning (Observed)";
+    }
+  }
 
-    // Handle codes like "TO.W" by checking the first two characters
-    if (eventCodeOrName.includes(".")) {
-      const mainCode = eventCodeOrName.substring(0, 2);
-      if (codeColors[mainCode]) {
-        return codeColors[mainCode];
+  // Enhanced detection for Severe Thunderstorm Warnings
+  if (eventName.includes("Severe Thunderstorm Warning")) {
+    const tstormDamageMatch = alertText.match(
+      /THUNDERSTORM DAMAGE THREAT\.{3}(CONSIDERABLE|DESTRUCTIVE)/i
+    );
+    if (tstormDamageMatch) {
+      const threatLevel = tstormDamageMatch[1].toUpperCase();
+      if (threatLevel === "DESTRUCTIVE") {
+        console.log(
+          "💥 [getAlertName] Destructive Severe Thunderstorm Warning detected"
+        );
+        return "Destructive Severe Thunderstorm Warning";
+      } else if (threatLevel === "CONSIDERABLE") {
+        console.log(
+          "⚡ [getAlertName] Considerable Severe Thunderstorm Warning detected"
+        );
+        return "Considerable Severe Thunderstorm Warning";
       }
     }
   }
 
-  // If not a code or code not found, try matching the event name
-  const nameColors = {
-    // --- Tornado Related ---
-    "Tornado Warning": "#FF0000", // Bright Red - Standard Tornado Warning
-    "Observed Tornado Warning": "#FF00FF", // Magenta
-    "Radar Confirmed Tornado Warning": "#FF00FF", // Magenta
-    "Spotter Confirmed Tornado Warning": "#FF00FF", // Magenta
-    "Public Confirmed Tornado Warning": "#FF00FF", // Magenta
-    "PDS Tornado Warning": "#FF00FF", // Magenta - Particularly Dangerous Situation Tornado Warning
-    "Tornado Emergency": "#850085", // Dark Purple - Gravest Tornado Threat
-    "Tornado Watch": "#8B0000", // Dark Red - Tornado Watch
-
-    // --- Severe Thunderstorm Related ---
-    "Severe Thunderstorm Warning": "#FF8000", // Orange
-    "Considerable Severe Thunderstorm Warning": "#FF6347", // Tomato
-    "Destructive Severe Thunderstorm Warning": "#FF4500", // OrangeRed
-    "Severe Thunderstorm Watch": "#DB7093", // Pale Violet Red
-
-    // --- Flood Related ---
-    "Flash Flood Warning": "#228B22", // Forest Green
-    "Flash Flood Emergency": "#8B0000", // Dark Red
-    "Flood Warning": "#3CB371", // Medium Sea Green
-    "Flood Watch": "#66CDAA", // Medium Aquamarine
-    "Flood Advisory": "#9ACD32", // Yellow Green
-    "Coastal Flood Warning": "#4682B4", // Steel Blue
-    "Coastal Flood Watch": "#87CEEB", // Sky Blue
-    "Coastal Flood Advisory": "#ADD8E6", // Light Blue
-
-    // --- Winter Weather Related ---
-    "Winter Weather Advisory": "#7B68EE", // Medium Slate Blue
-    "Winter Storm Warning": "#FF69B4", // Hot Pink
-    "Winter Storm Watch": "#6699CC", // Light Steel Blue
-    "Ice Storm Warning": "#8B008B", // Dark Magenta
-    "Blizzard Warning": "#FF4500", // OrangeRed
-    "Snow Squall Warning": "#64B5F6", // Light Blue
-    "Freezing Rain Advisory": "#008080", // Teal
-    "Freezing Fog Advisory": "#008080", // Teal
-    "Sleet Advisory": "#B0E0E6", // Powder Blue
-    "Lake Effect Snow Warning": "#4169E1", // Royal Blue
-    "Lake Effect Snow Advisory": "#87CEFA", // Light Sky Blue
-
-    // --- Wind Related ---
-    "High Wind Warning": "#DAA520", // Goldenrod
-    "High Wind Watch": "#B8860B", // Dark Goldenrod
-    "Wind Advisory": "#D2B48C", // Tan
-    "Gale Warning": "#008B8B", // Dark Cyan
-    "Storm Warning": "#483D8B", // Dark Slate Blue
-    "Hurricane Force Wind Warning": "#8B0000", // Dark Red
-
-    // --- Extreme Temperature Related ---
-    "Excessive Heat Warning": "#FFD700", // Gold
-    "Heat Advisory": "#F0E68C", // Khaki
-    "Excessive Wind Chill Warning": "#ADD8E6", // Light Blue
-    "Wind Chill Advisory": "#B0C4DE", // Light Steel Blue
-    "Freeze Warning": "#6A5ACD", // Slate Blue
-    "Hard Freeze Warning": "#483D8B", // Dark Slate Blue
-
-    // --- Fire Weather Related ---
-    "Red Flag Warning": "#B22222", // FireBrick
-    "Fire Weather Watch": "#CD5C5C", // IndianRed
-
-    // --- Coastal & Marine (non-wind/non-flood) ---
-    "High Surf Advisory": "#4682B4", // Steel Blue
-    "Rip Current Statement": "#1E90FF", // DodgerBlue
-    "Small Craft Advisory": "#5F9EA0", // CadetBlue
-
-    // --- Air Quality / Dust / Smoke ---
-    "Dense Fog Advisory": "#708090", // Slate Gray
-    "Dust Advisory": "#BDB76B", // Dark Khaki
-    "Dust Storm Warning": "#8B4513", // Saddle Brown
-    "Air Quality Alert": "#A9A9A9", // Dark Gray
-    "Dense Smoke Advisory": "#696969", // Dim Gray
-
-    // --- Tropical Cyclones ---
-    "Hurricane Warning": "#8B0000", // Dark Red
-    "Hurricane Watch": "#DC143C", // Crimson
-    "Tropical Storm Warning": "#FF4500", // OrangeRed
-    "Tropical Storm Watch": "#FFA07A", // LightSalmon
-    "Tropical Depression": "#FFB6C1", // LightPink
-    "Storm Surge Warning": "#800000", // Maroon
-    "Storm Surge Watch": "#A52A2A", // Brown
-
-    // --- Geological / Rare Events ---
-    "Tsunami Warning": "#8B0000", // Dark Red
-    "Tsunami Watch": "#DC143C", // Crimson
-    "Tsunami Advisory": "#FF4500", // OrangeRed
-    "Volcanic Ash Advisory": "#8B4513", // SaddleBrown
-
-    // --- General / Information ---
-    "Special Weather Statement": "#FFE4B5", // Moccasin
-    "Mesoscale Discussion": "#0066ff", // Blue
-    "Hazardous Weather Outlook": "#808080", // Gray
-    "Hydrologic Outlook": "#B0C4DE", // Light Steel Blue
-    "Beach Hazards Statement": "#F4A460", // SandyBrown
-  };
-
-  return nameColors[eventCodeOrName] || "rgba(255, 255, 255, 0.9)"; // Default for unknown alerts
+  return eventName;
 }
 
-function getAlertColor(eventCodeOrName) {
-  if (!eventCodeOrName) return "#CCCCCC";
+function getAlertColor(alert) {
+  const eventName = typeof alert === "string" ? alert : getAlertName(alert);
 
-  // First check if it's a two-letter event code
-  if (eventCodeOrName.length === 2) {
-    const codeColors = {
-      TO: "#FF0000", // Tornado
-      SV: "#FFA500", // Severe Thunderstorm
-      FF: "#00FF00", // Flash Flood
-      FL: "#00FFFF", // Flood
-      WS: "#0000FF", // Winter Storm
-      WW: "#800080", // Winter Weather
-      HU: "#FFC0CB", // Hurricane
-      TY: "#FFC0CB", // Typhoon
-      TR: "#FFC0CB", // Tropical Storm
-      BZ: "#FFFFFF", // Blizzard
-      HS: "#FFD700", // Heat
-      EH: "#FFD700", // Excessive Heat
-      HW: "#FFD700", // High Wind
-      FW: "#FF4500", // Fire Weather
-      RH: "#DDA0DD", // Radiological Hazard
-      EC: "#FFD700", // Evacuation
-      EVI: "#FFD700", // Evacuation Immediate
-      HMW: "#DDA0DD", // Hazardous Materials Warning
-      NUW: "#DDA0DD", // Nuclear Power Plant Warning
-      SPW: "#DDA0DD", // Shelter in Place Warning
-      VOW: "#DDA0DD", // Volcano Warning
-      AF: "#FF7F50", // Ashfall
-      AVW: "#C0C0C0", // Avalanche Warning
-      CAE: "#800000", // Child Abduction Emergency
-      CDW: "#008080", // Civil Danger Warning
-      CEM: "#008080", // Civil Emergency Message
-      CF: "#DAA520", // Coastal Flood
-      CFW: "#DAA520", // Coastal Flood Warning
-      DSW: "#8B4513", // Dust Storm Warning
-      EQW: "#800000", // Earthquake Warning
-      FRW: "#FF00FF", // Fire Warning
-      HLS: "#000000", // Hurricane Local Statement
-      LEW: "#800000", // Law Enforcement Warning
-      LAE: "#800000", // Local Area Emergency
-      TS: "#808000", // Tsunami
-      TSW: "#808000", // Tsunami Warning
-      SSW: "#FFD700", // Storm Surge Warning
-      TOW: "#FF0000", // Tornado Warning
-      TRW: "#FFC0CB", // Tropical Storm Warning
-      WIW: "#0000FF", // Wind
-      SPS: "#FFD700", // Special Weather Statement
-    };
-
-    if (codeColors[eventCodeOrName]) {
-      return codeColors[eventCodeOrName];
-    }
-
-    // Handle codes like "TO.W" by checking the first two characters
-    if (eventCodeOrName.includes(".")) {
-      const mainCode = eventCodeOrName.substring(0, 2);
-      if (codeColors[mainCode]) {
-        return codeColors[mainCode];
-      }
-    }
-  }
-
-  // If not a code or code not found, try matching the event name
   const nameColors = {
-    // --- Tornado Related ---
-    "Tornado Warning": "#FF0000", // Bright Red - Standard Tornado Warning
-    "Observed Tornado Warning": "#FF00FF", // Magenta
-    "Radar Confirmed Tornado Warning": "#FF00FF", // Magenta
-    "Spotter Confirmed Tornado Warning": "#FF00FF", // Magenta
-    "Public Confirmed Tornado Warning": "#FF00FF", // Magenta
-    "PDS Tornado Warning": "#FF00FF", // Magenta - Particularly Dangerous Situation Tornado Warning
-    "Tornado Emergency": "#850085", // Dark Purple - Gravest Tornado Threat
-    "Tornado Watch": "#8B0000", // Dark Red - Tornado Watch
+    "Tornado Warning": "#FF0000",
+    "Tornado Warning (Observed)": "#FF0000",
+    "Observed Tornado Warning": "#FF00FF",
+    "Radar Confirmed Tornado Warning": "#FF00FF",
+    "Spotter Confirmed Tornado Warning": "#FF00FF",
+    "Public Confirmed Tornado Warning": "#FF00FF",
+    "PDS Tornado Warning": "#FF0066",
+    "Tornado Emergency": "#850085",
+    "Tornado Watch": "#8B0000",
 
-    // --- Severe Thunderstorm Related ---
-    "Severe Thunderstorm Warning": "#FF8000", // Orange
-    "Considerable Severe Thunderstorm Warning": "#FF6347", // Tomato
-    "Destructive Severe Thunderstorm Warning": "#FF4500", // OrangeRed
-    "Severe Thunderstorm Watch": "#DB7093", // Pale Violet Red
+    "Severe Thunderstorm Warning": "#FF8000",
+    "Considerable Severe Thunderstorm Warning": "#FF6347",
+    "Destructive Severe Thunderstorm Warning": "#FF4500",
+    "Severe Thunderstorm Watch": "#DB7093",
 
-    // --- Flood Related ---
-    "Flash Flood Warning": "#228B22", // Forest Green
-    "Flash Flood Emergency": "#8B0000", // Dark Red
-    "Flood Warning": "#3CB371", // Medium Sea Green
-    "Flood Watch": "#66CDAA", // Medium Aquamarine
-    "Flood Advisory": "#9ACD32", // Yellow Green
-    "Coastal Flood Warning": "#4682B4", // Steel Blue
-    "Coastal Flood Watch": "#87CEEB", // Sky Blue
-    "Coastal Flood Advisory": "#ADD8E6", // Light Blue
+    "Flash Flood Warning": "#228B22",
+    "Flash Flood Emergency": "#8B0000",
+    "Flood Warning": "#3CB371",
+    "Flood Watch": "#66CDAA",
+    "Flood Advisory": "#9ACD32",
+    "Coastal Flood Warning": "#4682B4",
+    "Coastal Flood Watch": "#87CEEB",
+    "Coastal Flood Advisory": "#ADD8E6",
 
-    // --- Winter Weather Related ---
-    "Winter Weather Advisory": "#7B68EE", // Medium Slate Blue
-    "Winter Storm Warning": "#FF69B4", // Hot Pink
-    "Winter Storm Watch": "#6699CC", // Light Steel Blue
-    "Ice Storm Warning": "#8B008B", // Dark Magenta
-    "Blizzard Warning": "#FF4500", // OrangeRed
-    "Snow Squall Warning": "#64B5F6", // Light Blue
-    "Freezing Rain Advisory": "#008080", // Teal
-    "Freezing Fog Advisory": "#008080", // Teal
-    "Sleet Advisory": "#B0E0E6", // Powder Blue
-    "Lake Effect Snow Warning": "#4169E1", // Royal Blue
-    "Lake Effect Snow Advisory": "#87CEFA", // Light Sky Blue
+    "Winter Weather Advisory": "#7B68EE",
+    "Winter Storm Warning": "#FF69B4",
+    "Winter Storm Watch": "#6699CC",
+    "Ice Storm Warning": "#8B008B",
+    "Blizzard Warning": "#FF4500",
+    "Snow Squall Warning": "#64B5F6",
+    "Freezing Rain Advisory": "#008080",
+    "Freezing Fog Advisory": "#008080",
+    "Sleet Advisory": "#B0E0E6",
+    "Lake Effect Snow Warning": "#4169E1",
+    "Lake Effect Snow Advisory": "#87CEFA",
 
-    // --- Wind Related ---
-    "High Wind Warning": "#DAA520", // Goldenrod
-    "High Wind Watch": "#B8860B", // Dark Goldenrod
-    "Wind Advisory": "#D2B48C", // Tan
-    "Gale Warning": "#008B8B", // Dark Cyan
-    "Storm Warning": "#483D8B", // Dark Slate Blue
-    "Hurricane Force Wind Warning": "#8B0000", // Dark Red
+    "High Wind Warning": "#DAA520",
+    "High Wind Watch": "#B8860B",
+    "Wind Advisory": "#D2B48C",
+    "Gale Warning": "#008B8B",
+    "Storm Warning": "#483D8B",
+    "Hurricane Force Wind Warning": "#8B0000",
 
-    // --- Extreme Temperature Related ---
-    "Excessive Heat Warning": "#FFD700", // Gold
-    "Heat Advisory": "#F0E68C", // Khaki
-    "Excessive Wind Chill Warning": "#ADD8E6", // Light Blue
-    "Wind Chill Advisory": "#B0C4DE", // Light Steel Blue
-    "Freeze Warning": "#6A5ACD", // Slate Blue
-    "Hard Freeze Warning": "#483D8B", // Dark Slate Blue
+    "Excessive Heat Warning": "#FFD700",
+    "Heat Advisory": "#F0E68C",
+    "Excessive Wind Chill Warning": "#ADD8E6",
+    "Wind Chill Advisory": "#B0C4DE",
+    "Freeze Warning": "#6A5ACD",
+    "Hard Freeze Warning": "#483D8B",
 
-    // --- Fire Weather Related ---
-    "Red Flag Warning": "#B22222", // FireBrick
-    "Fire Weather Watch": "#CD5C5C", // IndianRed
+    "Red Flag Warning": "#B22222",
+    "Fire Weather Watch": "#CD5C5C",
 
-    // --- Coastal & Marine (non-wind/non-flood) ---
-    "High Surf Advisory": "#4682B4", // Steel Blue
-    "Rip Current Statement": "#1E90FF", // DodgerBlue
-    "Small Craft Advisory": "#5F9EA0", // CadetBlue
+    "High Surf Advisory": "#4682B4",
+    "Rip Current Statement": "#1E90FF",
+    "Small Craft Advisory": "#5F9EA0",
 
-    // --- Air Quality / Dust / Smoke ---
-    "Dense Fog Advisory": "#708090", // Slate Gray
-    "Dust Advisory": "#BDB76B", // Dark Khaki
-    "Dust Storm Warning": "#8B4513", // Saddle Brown
-    "Air Quality Alert": "#A9A9A9", // Dark Gray
-    "Dense Smoke Advisory": "#696969", // Dim Gray
+    "Dense Fog Advisory": "#708090",
+    "Dust Advisory": "#BDB76B",
+    "Dust Storm Warning": "#8B4513",
+    "Air Quality Alert": "#A9A9A9",
+    "Dense Smoke Advisory": "#696969",
 
-    // --- Tropical Cyclones ---
-    "Hurricane Warning": "#8B0000", // Dark Red
-    "Hurricane Watch": "#DC143C", // Crimson
-    "Tropical Storm Warning": "#FF4500", // OrangeRed
-    "Tropical Storm Watch": "#FFA07A", // LightSalmon
-    "Tropical Depression": "#FFB6C1", // LightPink
-    "Storm Surge Warning": "#800000", // Maroon
-    "Storm Surge Watch": "#A52A2A", // Brown
+    "Hurricane Warning": "#8B0000",
+    "Hurricane Watch": "#DC143C",
+    "Tropical Storm Warning": "#FF4500",
+    "Tropical Storm Watch": "#FFA07A",
+    "Tropical Depression": "#FFB6C1",
+    "Storm Surge Warning": "#800000",
+    "Storm Surge Watch": "#A52A2A",
 
-    // --- Geological / Rare Events ---
-    "Tsunami Warning": "#8B0000", // Dark Red
-    "Tsunami Watch": "#DC143C", // Crimson
-    "Tsunami Advisory": "#FF4500", // OrangeRed
-    "Volcanic Ash Advisory": "#8B4513", // SaddleBrown
+    "Tsunami Warning": "#8B0000",
+    "Tsunami Watch": "#DC143C",
+    "Tsunami Advisory": "#FF4500",
+    "Volcanic Ash Advisory": "#8B4513",
 
-    // --- General / Information ---
-    "Special Weather Statement": "#FFE4B5", // Moccasin
-    "Mesoscale Discussion": "#0066ff", // Blue
-    "Hazardous Weather Outlook": "#808080", // Gray
-    "Hydrologic Outlook": "#B0C4DE", // Light Steel Blue
-    "Beach Hazards Statement": "#F4A460", // SandyBrown
+    "Special Weather Statement": "#FFE4B5",
+    "Mesoscale Discussion": "#0066ff",
+    "Hazardous Weather Outlook": "#808080",
+    "Hydrologic Outlook": "#B0C4DE",
+    "Beach Hazards Statement": "#F4A460",
   };
 
-  return nameColors[eventCodeOrName] || "rgba(255, 255, 255, 0.9)"; // Default for unknown alerts
+  return nameColors[eventName] || "rgba(255, 255, 255, 0.9)";
 }
 
-// Helper function to create custom marker
 function createAlertMarker(title, icon, color) {
   const el = document.createElement("div");
   el.className = "alert-marker";
@@ -1884,7 +3095,6 @@ function createAlertMarker(title, icon, color) {
   return el;
 }
 
-// Function to get bounds from a polygon
 function getBoundsFromPolygon(polygon) {
   let minLat = 90,
     maxLat = -90,
@@ -1896,7 +3106,7 @@ function getBoundsFromPolygon(polygon) {
     polygon.coordinates &&
     polygon.coordinates.length > 0
   ) {
-    const coords = polygon.coordinates[0]; // Outer ring
+    const coords = polygon.coordinates[0];
 
     for (const coord of coords) {
       const lng = coord[0];
@@ -1912,476 +3122,529 @@ function getBoundsFromPolygon(polygon) {
   return { minLat, maxLat, minLng, maxLng };
 }
 
-// Function to add county-based alert
 function addAlertCounties(alert) {
-  // For county-based alerts, we'll add a marker at an approximate center
-  // In a real app, you'd geocode the counties to get precise locations
+  if (!countiesData || !countiesData.features) {
+    console.warn("Counties data not loaded yet");
+    return;
+  }
 
-  // Here's a simple approximation - using the first county as the marker location
-  // In a production app, you'd want to use a geocoding service to get proper coordinates
+  const sameCodes = alert.geocode?.SAME || [];
+  const ugcCodes = alert.ugc || alert.geocode?.UGC || [];
 
-  const firstCounty = alert.counties[0];
-  // For demo purposes, we're placing it at a fixed location
-  // You should replace this with actual geocoding in production
-  const center = [-95 + Math.random() * 30, 35 + Math.random() * 10]; // Random position in the US
+  if (sameCodes.length === 0 && ugcCodes.length === 0) {
+    console.warn(`Alert ${alert.id} has no SAME or UGC codes`);
+    return;
+  }
 
-  addAlertMarker(alert, center);
+  const matchingCounties = countiesData.features.filter((feature) => {
+    const geoid = feature.properties.GEOID;
+    return sameCodes.includes(geoid);
+  });
+
+  if (matchingCounties.length === 0) {
+    console.warn(`No matching counties found for alert ${alert.id}`);
+    return;
+  }
+
+  const id = `alert-${alert.id}`;
+  const color = getAlertColor(alert);
+
+  if (mapInstance.getLayer(`${id}-fill`)) mapInstance.removeLayer(`${id}-fill`);
+  if (mapInstance.getSource(id)) mapInstance.removeSource(id);
+
+  let combinedPolygon = null;
+
+  try {
+    for (const county of matchingCounties) {
+      if (!combinedPolygon) {
+        combinedPolygon = county.geometry;
+      } else {
+        combinedPolygon = turf.union(
+          turf.feature(combinedPolygon),
+          turf.feature(county.geometry)
+        ).geometry;
+      }
+    }
+  } catch (error) {
+    console.error(
+      `Error combining county polygons for alert ${alert.id}:`,
+      error
+    );
+    combinedPolygon = null;
+  }
+
+  const alertFeature = {
+    type: "Feature",
+    geometry: combinedPolygon || matchingCounties[0].geometry,
+    properties: {
+      id: id,
+      eventCode: alert.eventCode,
+    },
+  };
+
+  alert.areaGeometry = alertFeature.geometry;
+
+  mapInstance.addSource(id, {
+    type: "geojson",
+    data: alertFeature,
+  });
+
+  const radarExists = mapInstance.getLayer(radarLayerId);
+  const firstLabelLayer = mapInstance
+    .getStyle()
+    .layers.find(
+      (l) =>
+        l.type === "symbol" ||
+        (l.type === "line" &&
+          (l.id.includes("Road") ||
+            l.id.includes("Transit") ||
+            l.id.includes("Path") ||
+            l.id.includes("Railway")))
+    )?.id;
+
+  if (radarExists) {
+    mapInstance.addLayer(
+      {
+        id: `${id}-fill`,
+        type: "fill",
+        source: id,
+        paint: {
+          "fill-color": color,
+          "fill-opacity": ALERT_OUTLINE_CONFIG.fillOpacity,
+        },
+      },
+      radarLayerId
+    );
+  } else if (firstLabelLayer) {
+    mapInstance.addLayer(
+      {
+        id: `${id}-fill`,
+        type: "fill",
+        source: id,
+        paint: {
+          "fill-color": color,
+          "fill-opacity": ALERT_OUTLINE_CONFIG.fillOpacity,
+        },
+      },
+      firstLabelLayer
+    );
+  } else {
+    mapInstance.addLayer({
+      id: `${id}-fill`,
+      type: "fill",
+      source: id,
+      paint: {
+        "fill-color": color,
+        "fill-opacity": ALERT_OUTLINE_CONFIG.fillOpacity,
+      },
+    });
+  }
+
+  alert.mapLayerId = id;
+  alert.isCountyBased = true;
+
+  mapInstance.on("click", `${id}-fill`, (e) => handleAlertClick(e, alert));
+
+  console.log(
+    `✅ Added county-based alert ${alert.id} with ${matchingCounties.length} counties`
+  );
 }
 
-// Function to add an alert marker
 function addAlertMarker(alert, position) {
   return;
 }
-
-// Function to show alert details dropdown
-// Improved alert panel when clicked
 function showAlertDetails(alert) {
-  // Get icon and color based on event code
-  const icon = icons[alert.eventCode] || "⚠️";
-  const color = getAlertColor(alert.eventCode);
+  selectedAlert = alert;
 
-  // Format expiration date
-  const expiresFormatted = alert.expires ? formatDate(alert.expires) : "N/A";
+  const existing = document.getElementById("alert-details-panel");
+  if (existing) existing.remove();
 
-  // Format issued date
-  const issuedFormatted = alert.effective ? formatDate(alert.effective) : "N/A";
+  const icon = getAlertIcon(alert.eventCode);
+  const color = getAlertColor(alert);
+  const issued = alert.effective ? formatDate(alert.effective) : "N/A";
+  const expires = alert.expires ? formatDate(alert.expires) : "N/A";
+  const expiringSoon = isExpiringSoon(alert.expires);
 
-  // Build threats section
-  let threatsList = buildThreatsList(alert);
+  const panel = document.createElement("div");
+  panel.id = "alert-details-panel";
+  panel.className = "alert-panel";
 
-  // Create alert details HTML
-  const alertHTML = `
-    <div class="alert-details" style="border-left: 5px solid ${color}; box-shadow: 0 3px 10px rgba(0,0,0,0.2); border-radius: 8px; overflow: hidden;">
-      <div class="alert-header" style="background: ${color}; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center;">
-        <h3 style="margin: 0; font-size: 1.4rem;">${icon} ${
-    alert.eventName
-  }</h3>
-        <span class="alert-close" style="cursor: pointer; font-size: 20px;">×</span>
+  panel.innerHTML = `
+    <div class="alert-panel__header" style="--accent:${color}">
+      <div class="alert-panel__badge">${icon}</div>
+      <div class="alert-panel__title">
+        <p class="eyebrow">${alert.eventCode || "ALERT"}</p>
+        <h3>${alert.eventName || "Unknown Alert"}</h3>
+        <small>${alert.office || "National Weather Service"}</small>
       </div>
-      
-      <div class="alert-body" style="padding: 15px; background: #fff;">
-        <div class="alert-time-info" style="display: flex; justify-content: space-between; margin-bottom: 15px; color: #555; font-size: 0.9rem;">
-          <div>Issued: <span style="font-weight: bold;">${issuedFormatted}</span></div>
-          <div>Expires: <span style="font-weight: bold; ${
-            isExpiringSoon(alert.expires) ? "color: #f44336;" : ""
-          }">${expiresFormatted}</span></div>
-        </div>
-        
-        <div class="alert-locations" style="margin-bottom: 15px;">
-          <h4 style="margin: 0 0 8px 0; color: #333; border-bottom: 1px solid #eee; padding-bottom: 5px;">Affected Areas</h4>
-          <p style="margin: 0;">${alert.counties.join(", ")}</p>
-        </div>
-        
-        ${threatsList}
-        
-        <div class="alert-actions" style="margin-top: 15px; display: flex; justify-content: flex-end;">
-          <button class="view-full-alert" style="background: ${color}; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer;">View Full Alert</button>
-        </div>
-      </div>
+      <button class="alert-panel__close" aria-label="Close">×</button>
+    </div>
+
+    <div class="alert-panel__body">
+      <section class="stats">
+        <article>
+          <span>Issued</span>
+          <strong>${issued}</strong>
+        </article>
+        <article class="${expiringSoon ? "danger" : ""}">
+          <span>Expires</span>
+          <strong>${expires}</strong>
+        </article>
+        <article>
+          <span>Severity</span>
+          <strong>${alert.severity || "Unknown"}</strong>
+        </article>
+      </section>
+
+      <section class="details">
+        <h4>Affected Areas</h4>
+        <p>${
+          alert.counties
+            ? alert.counties.join(", ")
+            : alert.zones?.join(", ") || "Not specified"
+        }</p>
+      </section>
+
+      ${buildCompactThreatsList(alert)}
+
+      <section class="details">
+        <h4>Summary</h4>
+        <p>${alert.headline || alert.description || "No summary available."}</p>
+      </section>
+    </div>
+
+    <div class="alert-panel__footer">
+      <button class="ghost-btn" id="focus-alert">Zoom to Polygon</button>
+      <button class="solid-btn" id="view-full-alert">View Full Text</button>
     </div>
   `;
 
-  // Create or update alert panel
-  const alertPanel =
-    document.getElementById("alert-panel") || createAlertPanel();
-  alertPanel.innerHTML = alertHTML;
-
-  // Add event listeners
-  alertPanel.querySelector(".alert-close").addEventListener("click", () => {
-    alertPanel.style.display = "none";
-  });
-
-  alertPanel.querySelector(".view-full-alert").addEventListener("click", () => {
-    showFullAlertText(alert.rawText);
-  });
-}
-
-// Helper function to check if alert is expiring soon (within 30 minutes)
-function isExpiringSoon(expiresDate) {
-  if (!expiresDate) return false;
-  const expires = new Date(expiresDate);
-  const now = new Date();
-  return expires - now < 30 * 60 * 1000; // 30 minutes in milliseconds
-}
-
-// Helper function to create alert panel container
-function createAlertPanel() {
-  const panel = document.createElement("div");
-  panel.id = "alert-panel";
-  panel.style.position = "absolute";
-  panel.style.top = "50px";
-  panel.style.right = "10px";
-  panel.style.width = "350px";
-  panel.style.zIndex = "1000";
-  panel.style.transition = "all 0.3s ease-in-out";
   document.body.appendChild(panel);
-  return panel;
-}
 
-// Build enhanced threats list
-function buildThreatsList(alert) {
-  if (!alert.threats) return "";
-
-  const threats = [];
-  const threatIcons = {
-    tornado: "🌪️",
-    damage: "💥",
-    wind: "💨",
-    hail: "🧊",
-    flood: "🌊",
+  panel.querySelector(".alert-panel__close").onclick = () => panel.remove();
+  panel.querySelector("#view-full-alert").onclick = () => {
+    if (alert.rawText) showFullAlertText(alert.rawText);
+    else alert("Full alert text not available.");
+  };
+  panel.querySelector("#focus-alert").onclick = () => {
+    showDetailedAlert(alert);
   };
 
-  if (alert.threats.tornadoDetection) {
-    threats.push(`
-      <div class="threat-item" style="display: flex; align-items: center; margin-bottom: 8px;">
-        <div style="margin-right: 10px; font-size: 1.2rem;">${threatIcons.tornado}</div>
-        <div>
-          <div style="font-weight: bold;">Tornado</div>
-          <div>${alert.threats.tornadoDetection}</div>
-        </div>
-      </div>
-    `);
-  }
+  panel.style.top = "24px";
+  panel.style.right = "24px";
 
-  if (alert.threats.tornadoDamageThreat) {
-    threats.push(`
-      <div class="threat-item" style="display: flex; align-items: center; margin-bottom: 8px;">
-        <div style="margin-right: 10px; font-size: 1.2rem;">${threatIcons.damage}</div>
-        <div>
-          <div style="font-weight: bold;">Tornado Damage Threat</div>
-          <div>${alert.threats.tornadoDamageThreat}</div>
-        </div>
-      </div>
-    `);
-  }
+  document.addEventListener(
+    "click",
+    function dismiss(e) {
+      if (
+        !panel.contains(e.target) &&
+        !e.target.closest(".alert-item-modern")
+      ) {
+        panel.remove();
+        document.removeEventListener("click", dismiss);
+      }
+    },
+    { capture: true }
+  );
 
-  if (alert.threats.thunderstormDamageThreat) {
-    threats.push(`
-      <div class="threat-item" style="display: flex; align-items: center; margin-bottom: 8px;">
-        <div style="margin-right: 10px; font-size: 1.2rem;">${threatIcons.damage}</div>
-        <div>
-          <div style="font-weight: bold;">Thunderstorm Damage Threat</div>
-          <div>${alert.threats.thunderstormDamageThreat}</div>
-        </div>
-      </div>
-    `);
-  }
-
-  if (alert.threats.flashFloodDamageThreat) {
-    threats.push(`
-      <div class="threat-item" style="display: flex; align-items: center; margin-bottom: 8px;">
-        <div style="margin-right: 10px; font-size: 1.2rem;">${threatIcons.flood}</div>
-        <div>
-          <div style="font-weight: bold;">Flash Flood Damage Threat</div>
-          <div>${alert.threats.flashFloodDamageThreat}</div>
-        </div>
-      </div>
-    `);
-  }
-
-  if (alert.threats.hailThreat) {
-    threats.push(`
-      <div class="threat-item" style="display: flex; align-items: center; margin-bottom: 8px;">
-        <div style="margin-right: 10px; font-size: 1.2rem;">${
-          threatIcons.hail
-        }</div>
-        <div>
-          <div style="font-weight: bold;">Hail Threat</div>
-          <div>${alert.threats.hailThreat}${
-      alert.threats.maxHailSize
-        ? ` - Max Size: ${alert.threats.maxHailSize}`
-        : ""
-    }</div>
-        </div>
-      </div>
-    `);
-  }
-
-  if (alert.threats.windThreat) {
-    threats.push(`
-      <div class="threat-item" style="display: flex; align-items: center; margin-bottom: 8px;">
-        <div style="margin-right: 10px; font-size: 1.2rem;">${
-          threatIcons.wind
-        }</div>
-        <div>
-          <div style="font-weight: bold;">Wind Threat</div>
-          <div>${alert.threats.windThreat}${
-      alert.threats.maxWindGust
-        ? ` - Max Gust: ${alert.threats.maxWindGust}`
-        : ""
-    }</div>
-        </div>
-      </div>
-    `);
-  }
-
-  if (threats.length > 0) {
-    return `
-      <div class="threat-section" style="margin-bottom: 15px;">
-        <h4 style="margin: 0 0 10px 0; color: #333; border-bottom: 1px solid #eee; padding-bottom: 5px;">Threat Information</h4>
-        <div>${threats.join("")}</div>
-      </div>
-    `;
-  }
-
-  return "";
+  injectAlertPanelStyles();
 }
 
-// Show full alert text in a modal
-function showFullAlertText(rawText) {
-  // Create modal backdrop
-  const backdrop = document.createElement("div");
-  backdrop.style.position = "fixed";
-  backdrop.style.top = "0";
-  backdrop.style.left = "0";
-  backdrop.style.right = "0";
-  backdrop.style.bottom = "0";
-  backdrop.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
-  backdrop.style.zIndex = "2000";
-  backdrop.style.display = "flex";
-  backdrop.style.justifyContent = "center";
-  backdrop.style.alignItems = "center";
+function buildCompactThreatsList(alert) {
+  if (!alert.threats) return "";
 
-  // Create modal content
-  const modal = document.createElement("div");
-  modal.style.backgroundColor = "white";
-  modal.style.borderRadius = "8px";
-  modal.style.maxWidth = "600px";
-  modal.style.width = "90%";
-  modal.style.maxHeight = "80vh";
-  modal.style.overflowY = "auto";
-  modal.style.position = "relative";
-
-  // Create close button
-  const closeBtn = document.createElement("button");
-  closeBtn.innerHTML = "×";
-  closeBtn.style.position = "absolute";
-  closeBtn.style.top = "10px";
-  closeBtn.style.right = "10px";
-  closeBtn.style.background = "none";
-  closeBtn.style.border = "none";
-  closeBtn.style.fontSize = "24px";
-  closeBtn.style.cursor = "pointer";
-
-  // Create content
-  const content = document.createElement("div");
-  content.style.padding = "20px";
-  content.innerHTML = `<pre style="white-space: pre-wrap; font-family: monospace;">${rawText}</pre>`;
-
-  // Assemble modal
-  modal.appendChild(closeBtn);
-  modal.appendChild(content);
-  backdrop.appendChild(modal);
-
-  // Add to document
-  document.body.appendChild(backdrop);
-
-  // Add event listeners
-  closeBtn.addEventListener("click", () => {
-    document.body.removeChild(backdrop);
-  });
-
-  backdrop.addEventListener("click", (e) => {
-    if (e.target === backdrop) {
-      document.body.removeChild(backdrop);
-    }
-  });
-}
-
-// Function to close alert details when clicking outside
-function closeAlertDetailsOutside(event) {
-  if (
-    alertDetailsElement &&
-    !alertDetailsElement.contains(event.target) &&
-    !event.target.closest(".alert-marker")
-  ) {
-    alertDetailsElement.remove();
-    alertDetailsElement = null;
-    document.removeEventListener("click", closeAlertDetailsOutside);
-  }
-}
-
-// Function to show the full alert details modal
-function showFullAlertDetails(alert) {
-  // Remove the dropdown
-  if (alertDetailsElement) {
-    alertDetailsElement.remove();
-    alertDetailsElement = null;
-  }
-
-  // Create the modal
-  const modal = document.createElement("div");
-  modal.className = "alert-modal";
-  modal.id = "alert-modal";
-
-  // Style the modal
-  Object.assign(modal.style, {
-    position: "fixed",
-    top: "0",
-    left: "0",
-    width: "100%",
-    height: "100%",
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 2000,
-  });
-
-  const alertColor = getAlertColor(alert.eventCode);
-
-  // Build the modal content
-  const modalContent = document.createElement("div");
-  Object.assign(modalContent.style, {
-    backgroundColor: "white",
-    padding: "20px",
-    borderRadius: "10px",
-    maxWidth: "700px",
-    width: "80%",
-    maxHeight: "80vh",
-    overflowY: "auto",
-    position: "relative",
-  });
-
-  // Add a close button
-  const closeButton = document.createElement("button");
-  closeButton.textContent = "×";
-  Object.assign(closeButton.style, {
-    position: "absolute",
-    top: "10px",
-    right: "15px",
-    background: "none",
-    border: "none",
-    fontSize: "24px",
-    cursor: "pointer",
-    color: "#333",
-  });
-  closeButton.addEventListener("click", () => modal.remove());
-
-  // Format expiration date if available
-  const expiresFormatted = alert.expires ? formatDate(alert.expires) : "N/A";
-
-  // Create alert threat list
-  let threatsList = "";
-  if (alert.threats) {
-    const threats = [];
-    if (alert.threats.tornadoDetection)
-      threats.push(`<li>Tornado: ${alert.threats.tornadoDetection}</li>`);
-    if (alert.threats.tornadoDamageThreat)
-      threats.push(
-        `<li>Tornado Damage Threat: ${alert.threats.tornadoDamageThreat}</li>`
-      );
-    if (alert.threats.thunderstormDamageThreat)
-      threats.push(
-        `<li>Thunderstorm Damage Threat: ${alert.threats.thunderstormDamageThreat}</li>`
-      );
-    if (alert.threats.flashFloodDamageThreat)
-      threats.push(
-        `<li>Flash Flood Damage Threat: ${alert.threats.flashFloodDamageThreat}</li>`
-      );
-    if (alert.threats.hailThreat)
-      threats.push(`<li>Hail Threat: ${alert.threats.hailThreat}</li>`);
-    if (alert.threats.maxHailSize)
-      threats.push(`<li>Max Hail Size: ${alert.threats.maxHailSize}</li>`);
-    if (alert.threats.windThreat)
-      threats.push(`<li>Wind Threat: ${alert.threats.windThreat}</li>`);
-    if (alert.threats.maxWindGust)
-      threats.push(`<li>Max Wind Gust: ${alert.threats.maxWindGust}</li>`);
-
-    if (threats.length > 0) {
-      threatsList = `
-        <div class="threat-section">
-          <h4>Threat Information</h4>
-          <ul>${threats.join("")}</ul>
+  const rows = [
+    { key: "tornadoDetection", icon: "🌪️", label: "Tornado" },
+    { key: "hailThreat", icon: "🧊", label: "Hail" },
+    { key: "windThreat", icon: "💨", label: "Wind" },
+    { key: "floodThreat", icon: "🌊", label: "Flood" },
+  ]
+    .filter(({ key }) => alert.threats[key])
+    .map(
+      ({ key, icon, label }) => `
+      <li>
+        <span>${icon}</span>
+        <div>
+          <strong>${label}</strong>
+          <small>${alert.threats[key]}</small>
         </div>
-      `;
-    }
-  }
+      </li>`
+    );
 
-  // Build modal HTML
-  modalContent.innerHTML = `
-    <header style="border-bottom: 3px solid ${alertColor}; padding-bottom: 10px; margin-bottom: 15px;">
-      <div style="display: flex; align-items: center;">
-        <div style="background-color: ${alertColor}; width: 40px; height: 40px; border-radius: 50%; margin-right: 15px; display: flex; justify-content: center; align-items: center; color: white; font-size: 20px;">
-          ${getAlertIcon(alert.eventCode)}
-        </div>
-        <h2 style="margin: 0; color: ${alertColor};">${alert.eventName}</h2>
-      </div>
-    </header>
-    
-    <div class="alert-content" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-      <div class="alert-meta">
-        <div class="alert-section">
-          <h4>Alert Information</h4>
-          <p><strong>Event Code:</strong> ${alert.eventCode || "N/A"}</p>
-          <p><strong>Issued By:</strong> ${
-            alert.office || "National Weather Service"
-          }</p>
-          <p><strong>Expires:</strong> ${expiresFormatted}</p>
-        </div>
-        
-        <div class="alert-section">
-          <h4>Affected Areas</h4>
-          <p>${alert.counties.join(", ")}</p>
-        </div>
-        
-        ${threatsList}
-      </div>
-      
-      <div class="alert-raw-text" style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; font-family: monospace; font-size: 12px; white-space: pre-wrap; overflow-x: auto;">
-        ${alert.rawText || "No additional details available."}
-      </div>
-    </div>
+  if (!rows.length) return "";
+
+  return `
+    <section class="details">
+      <h4>Threats</h4>
+      <ul class="threat-list">
+        ${rows.join("")}
+      </ul>
+    </section>
   `;
-
-  modalContent.appendChild(closeButton);
-  modal.appendChild(modalContent);
-  document.body.appendChild(modal);
-
-  // Close modal when clicking outside
-  modal.addEventListener("click", (e) => {
-    if (e.target === modal) {
-      modal.remove();
-    }
-  });
 }
 
-// Function to update an existing alert on the map
+let alertPanelStyleInjected = false;
+function injectAlertPanelStyles() {
+  if (alertPanelStyleInjected) return;
+  alertPanelStyleInjected = true;
+
+  const style = document.createElement("style");
+  style.textContent = `
+    .alert-panel {
+      position: fixed;
+      width: 360px;
+      max-height: calc(100vh - 48px);
+      background: rgba(8,12,24,0.92);
+      backdrop-filter: blur(22px);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 24px;
+      box-shadow: 0 25px 70px rgba(2,6,23,0.85);
+      color: #f8fafc;
+      font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont;
+      display: flex;
+      flex-direction: column;
+      animation: panelSlideIn 0.35s cubic-bezier(0.16,0.68,0.43,0.99);
+      z-index: 1100;
+    }
+
+    .alert-panel__header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 20px 22px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      background: radial-gradient(circle at top right, color-mix(in srgb, var(--accent, #4ade80) 40%, transparent), transparent);
+    }
+
+    .alert-panel__badge {
+      width: 58px;
+      height: 58px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.08);
+      display: grid;
+      place-items: center;
+      font-size: 30px;
+      border: 1px solid rgba(255,255,255,0.15);
+      box-shadow: 0 0 25px color-mix(in srgb, var(--accent, #4ade80) 35%, transparent);
+      animation: pulseRing 2.2s ease-out infinite;
+    }
+
+    .alert-panel__title .eyebrow {
+      margin: 0;
+      text-transform: uppercase;
+      letter-spacing: 0.4em;
+      font-size: 0.7rem;
+      opacity: 0.65;
+    }
+    .alert-panel__title h3 {
+      margin: 4px 0;
+      font-size: 1.35rem;
+      line-height: 1.3;
+    }
+    .alert-panel__title small {
+      opacity: 0.7;
+      font-size: 0.85rem;
+    }
+
+    .alert-panel__close {
+      margin-left: auto;
+      border: none;
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      width: 34px;
+      height: 34px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-size: 20px;
+      transition: all 0.2s;
+    }
+    .alert-panel__close:hover {
+      background: rgba(255,255,255,0.2);
+      transform: translateY(-2px);
+    }
+
+    .alert-panel__body {
+      padding: 20px 22px 10px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .stats article {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      padding: 12px;
+      text-align: center;
+    }
+    .stats article span {
+      display: block;
+      text-transform: uppercase;
+      letter-spacing: 0.3em;
+      font-size: 0.65rem;
+      opacity: 0.6;
+      margin-bottom: 6px;
+    }
+    .stats article strong {
+      font-size: 0.9rem;
+      line-height: 1.2;
+    }
+    .stats article.danger {
+      border-color: rgba(239,68,68,0.5);
+      box-shadow: 0 0 15px rgba(239,68,68,0.15);
+      color: #fecaca;
+    }
+
+    .details {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+    .details h4 {
+      margin: 0 0 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.35em;
+      font-size: 0.7rem;
+      opacity: 0.65;
+    }
+    .details p {
+      margin: 0;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      color: rgba(248,250,252,0.9);
+    }
+
+    .threat-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .threat-list li {
+      display: flex;
+      gap: 12px;
+      padding: 10px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.05);
+      align-items: center;
+    }
+    .threat-list span {
+      font-size: 24px;
+    }
+    .threat-list strong {
+      display: block;
+      margin-bottom: 2px;
+    }
+    .threat-list small {
+      color: rgba(226,232,240,0.75);
+      font-size: 0.85rem;
+    }
+
+    .alert-panel__footer {
+      padding: 16px 22px 20px;
+      display: flex;
+      gap: 12px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      background: rgba(2,6,23,0.9);
+    }
+    .solid-btn,
+    .ghost-btn {
+      flex: 1;
+      border-radius: 14px;
+      padding: 12px 16px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s ease, opacity 0.2s ease;
+    }
+    .solid-btn {
+      border: none;
+      background: linear-gradient(135deg, rgba(249,115,22,0.95), rgba(244,63,94,0.95));
+      color: #fff;
+      box-shadow: 0 15px 30px rgba(244,63,94,0.35);
+    }
+    .ghost-btn {
+      border: 1px solid rgba(255,255,255,0.25);
+      background: rgba(255,255,255,0.05);
+      color: #fff;
+    }
+    .solid-btn:hover,
+    .ghost-btn:hover {
+      transform: translateY(-2px);
+      opacity: 0.93;
+    }
+
+    @keyframes panelSlideIn {
+      from { opacity: 0; transform: translate(40px,-20px) scale(0.95); }
+      to { opacity: 1; transform: translate(0,0) scale(1); }
+    }
+    @keyframes pulseRing {
+      0% { box-shadow: 0 0 0 0 rgba(255,255,255,0.25); }
+      70% { box-shadow: 0 0 0 24px rgba(255,255,255,0); }
+      100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); }
+    }
+
+    @media (max-width: 600px) {
+      .alert-panel {
+        width: calc(100vw - 32px);
+        right: 16px;
+        top: 16px;
+      }
+      .stats {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
 function updateAlertOnMap(alert) {
-  // Remove the old alert first
   removeAlertFromMap(alert.id);
-  // Then add the updated alert
   addAlertToMap(alert);
 }
 
-// Function to remove an alert from the map
 function removeAlertFromMap(alertId) {
   const alert = activeAlerts.get(alertId);
   if (!alert) return;
 
-  // Remove the marker if it exists
   if (alert.marker) {
     alert.marker.remove();
   }
 
-  // Remove the polygon layers if they exist
-  if (mapInstance.getLayer(`alert-fill-${alertId}`)) {
-    mapInstance.removeLayer(`alert-fill-${alertId}`);
+  if (mapInstance.getLayer(`alert-${alertId}-fill`)) {
+    mapInstance.removeLayer(`alert-${alertId}-fill`);
   }
 
-  if (mapInstance.getLayer(`alert-line-${alertId}`)) {
-    mapInstance.removeLayer(`alert-line-${alertId}`);
+  if (mapInstance.getLayer(`alert-${alertId}-outline-inner`)) {
+    mapInstance.removeLayer(`alert-${alertId}-outline-inner`);
   }
 
-  // Remove the source if it exists
+  if (mapInstance.getLayer(`alert-${alertId}-outline-outer`)) {
+    mapInstance.removeLayer(`alert-${alertId}-outline-outer`);
+  }
+
   if (mapInstance.getSource(`alert-${alertId}`)) {
     mapInstance.removeSource(`alert-${alertId}`);
   }
 
-  // Remove from our collection
   activeAlerts.delete(alertId);
 
-  // If this was the selected alert, remove the details panel
+  if (selectedAlert && selectedAlert.id === alertId) {
+    const alertToReset = selectedAlert;
+    selectedAlert = null;
+    stopAlertFlashing(alertToReset);
+  }
+
   if (selectedAlert && selectedAlert.id === alertId && alertDetailsElement) {
     alertDetailsElement.remove();
     alertDetailsElement = null;
@@ -2389,113 +3652,57 @@ function removeAlertFromMap(alertId) {
   }
 }
 
-// Helper function to get alert color based on event code
-function getAlertColor(eventCode) {
-  if (!eventCode) return "#CCCCCC";
-
-  const colors = {
-    TO: "#FF0000", // Tornado
-    SV: "#FFA500", // Severe Thunderstorm
-    FF: "#00FF00", // Flash Flood
-    FL: "#00FFFF", // Flood
-    WS: "#0000FF", // Winter Storm
-    WW: "#800080", // Winter Weather
-    HU: "#FFC0CB", // Hurricane
-    TY: "#FFC0CB", // Typhoon
-    TR: "#FFC0CB", // Tropical Storm
-    BZ: "#FFFFFF", // Blizzard
-    HS: "#FFD700", // Heat
-    EH: "#FFD700", // Excessive Heat
-    HW: "#FFD700", // High Wind
-    FW: "#FF4500", // Fire Weather
-    RH: "#DDA0DD", // Radiological Hazard
-    EC: "#FFD700", // Evacuation
-    EVI: "#FFD700", // Evacuation Immediate
-    HMW: "#DDA0DD", // Hazardous Materials Warning
-    NUW: "#DDA0DD", // Nuclear Power Plant Warning
-    SPW: "#DDA0DD", // Shelter in Place Warning
-    VOW: "#DDA0DD", // Volcano Warning
-    AF: "#FF7F50", // Ashfall
-    AVW: "#C0C0C0", // Avalanche Warning
-    CAE: "#800000", // Child Abduction Emergency
-    CDW: "#008080", // Civil Danger Warning
-    CEM: "#008080", // Civil Emergency Message
-    CF: "#DAA520", // Coastal Flood
-    CFW: "#DAA520", // Coastal Flood Warning
-    DSW: "#8B4513", // Dust Storm Warning
-    EQW: "#800000", // Earthquake Warning
-    FRW: "#FF00FF", // Fire Warning
-    HLS: "#000000", // Hurricane Local Statement
-    LEW: "#800000", // Law Enforcement Warning
-    LAE: "#800000", // Local Area Emergency
-    TS: "#808000", // Tsunami
-    TSW: "#808000", // Tsunami Warning
-    SSW: "#FFD700", // Storm Surge Warning
-    TOW: "#FF0000", // Tornado Warning
-    TRW: "#FFC0CB", // Tropical Storm Warning
-    WIW: "#0000FF", // Wind
-    SPS: "#FFD700", // Special Weather Statement
-  };
-
-  // Handle event codes like "TO.W" by checking the first two characters
-  const mainCode = eventCode.substring(0, 2);
-  return colors[mainCode] || colors[eventCode] || "#CCCCCC";
-}
-
-// Helper function to get alert icon based on event code
 function getAlertIcon(eventCode) {
   if (!eventCode) return "⚠️";
 
   const icons = {
-    TO: "🌪️", // Tornado
-    SV: "⛈️", // Severe Thunderstorm
-    FF: "🌊", // Flash Flood
-    FL: "💧", // Flood
-    WS: "❄️", // Winter Storm
-    WW: "🌨️", // Winter Weather
-    HU: "🌀", // Hurricane
-    TY: "🌀", // Typhoon
-    TR: "🌀", // Tropical Storm
-    BZ: "❄️", // Blizzard
-    HS: "🔥", // Heat
-    EH: "🔥", // Excessive Heat
-    HW: "💨", // High Wind
-    FW: "🔥", // Fire Weather
-    RH: "☢️", // Radiological Hazard
-    EC: "🚗", // Evacuation
-    EVI: "🏃", // Evacuation Immediate
-    HMW: "☣️", // Hazardous Materials Warning
-    NUW: "☢️", // Nuclear Power Plant Warning
-    SPW: "🏠", // Shelter in Place Warning
-    VOW: "🌋", // Volcano Warning
-    AF: "🌋", // Ashfall
-    AVW: "⛰️", // Avalanche Warning
-    CAE: "👶", // Child Abduction Emergency
-    CDW: "⚠️", // Civil Danger Warning
-    CEM: "⚠️", // Civil Emergency Message
-    CF: "🌊", // Coastal Flood
-    CFW: "🌊", // Coastal Flood Warning
-    DSW: "💨", // Dust Storm Warning
-    EQW: "🏚️", // Earthquake Warning
-    FRW: "🔥", // Fire Warning
-    HLS: "🌀", // Hurricane Local Statement
-    LEW: "👮", // Law Enforcement Warning
-    LAE: "⚠️", // Local Area Emergency
-    TS: "🌊", // Tsunami
-    TSW: "🌊", // Tsunami Warning
-    SSW: "🌊", // Storm Surge Warning
-    TOW: "🌪️", // Tornado Warning
-    TRW: "🌀", // Tropical Storm Warning
-    WIW: "💨", // Wind
-    SPS: "⚠️", // Special Weather Statement
+    TO: "🌪️",
+    SV: "⛈️",
+    FF: "🌊",
+    FL: "💧",
+    WS: "❄️",
+    WW: "🌨️",
+    HU: "🌀",
+    TY: "🌀",
+    TR: "🌀",
+    BZ: "❄️",
+    HS: "🔥",
+    EH: "🔥",
+    HW: "💨",
+    FW: "🔥",
+    RH: "☢️",
+    EC: "🚗",
+    EVI: "🏃",
+    HMW: "☣️",
+    NUW: "☢️",
+    SPW: "🏠",
+    VOW: "🌋",
+    AF: "🌋",
+    AVW: "⛰️",
+    CAE: "👶",
+    CDW: "⚠️",
+    CEM: "⚠️",
+    CF: "🌊",
+    CFW: "🌊",
+    DSW: "💨",
+    EQW: "🏚️",
+    FRW: "🔥",
+    HLS: "🌀",
+    LEW: "👮",
+    LAE: "⚠️",
+    TS: "🌊",
+    TSW: "🌊",
+    SSW: "🌊",
+    TOW: "🌪️",
+    TRW: "🌀",
+    WIW: "💨",
+    SPS: "⚠️",
   };
 
-  // Handle event codes like "TO.W" by checking the first two characters
   const mainCode = eventCode.substring(0, 2);
   return icons[mainCode] || icons[eventCode] || "⚠️";
 }
 
-// Helper function to format dates
 function formatDate(dateString) {
   const date = new Date(dateString);
   return date.toLocaleString("en-US", {
@@ -2508,9 +3715,7 @@ function formatDate(dateString) {
   });
 }
 
-// Call this function after the map is initialized
 function initializeWeatherAlerts() {
-  // Add a CSS class for alert markers
   const style = document.createElement("style");
   style.textContent = `
     .alert-marker {
@@ -2522,34 +3727,327 @@ function initializeWeatherAlerts() {
   `;
   document.head.appendChild(style);
 
-  // Initialize the SSE connection
-  initAlertFeed();
+  if (!isArchiveMode) {
+    initAlertFeed();
+  }
 }
 
-// Initialize the app when the window loads
+/**
+ * Fetch historical warnings from IEM API for a specific timestamp
+ * @param {Date} timestamp - The timestamp to fetch warnings for
+ */
+async function fetchHistoricalWarnings(timestamp) {
+  try {
+    const dateStr = timestamp.toISOString().split("T")[0];
+    const timeStr = timestamp.toISOString().split("T")[1].split(".")[0];
+
+    console.log(`🌩️ Fetching warnings ACTIVE at ${dateStr} ${timeStr}...`);
+
+    const torUrl = `http://localhost:5100/api/archive/warnings?date=${dateStr}&time=${timeStr}&pil=TOR`;
+    const svrUrl = `http://localhost:5100/api/archive/warnings?date=${dateStr}&time=${timeStr}&pil=SVR`;
+
+    console.log(`   Fetching TOR: ${torUrl}`);
+    console.log(`   Fetching SVR: ${svrUrl}`);
+
+    const [torResponse, svrResponse] = await Promise.all([
+      fetch(torUrl),
+      fetch(svrUrl),
+    ]);
+
+    if (!torResponse.ok || !svrResponse.ok) {
+      throw new Error(
+        `HTTP error! TOR: ${torResponse.status}, SVR: ${svrResponse.status}`
+      );
+    }
+
+    const torData = await torResponse.json();
+    const svrData = await svrResponse.json();
+
+    const allAlerts = [...(torData.alerts || []), ...(svrData.alerts || [])];
+
+    console.log(
+      `✅ Loaded ${allAlerts.length} historical warnings (${
+        torData.count || 0
+      } TOR, ${svrData.count || 0} SVR)`
+    );
+
+    displayHistoricalWarningsAsLive(allAlerts);
+
+    return allAlerts;
+  } catch (error) {
+    console.error("❌ Error fetching historical warnings:", error);
+    return [];
+  }
+}
+
+/**
+ * Display historical warnings on the map AS IF they were live alerts
+ * Uses the exact same polygon plotting logic as real-time alerts
+ */
+function displayHistoricalWarningsAsLive(alerts) {
+  const targetMap = mapInstance;
+  if (!targetMap) {
+    console.warn(
+      "Map instance unavailable; cannot display historical warnings."
+    );
+    return;
+  }
+
+  console.log(`\n${"=".repeat(60)}`);
+  console.log(`🗺️ [MAP] Displaying ${alerts.length} historical warnings`);
+  console.log(`${"=".repeat(60)}`);
+
+  clearHistoricalAlerts();
+
+  if (alerts.length === 0) {
+    console.log("📭 No historical warnings to display");
+    return;
+  }
+
+  alerts.forEach((alert, idx) => {
+    console.log(
+      `\n[${idx + 1}/${alerts.length}] Adding historical alert to map:`
+    );
+    console.log(`   Event: ${alert.event}`);
+    console.log(`   ID: ${alert.id}`);
+    console.log(
+      `   Polygon: ${alert.polygon ? alert.polygon.length + " points" : "NONE"}`
+    );
+
+    if (!alert.polygon || alert.polygon.length === 0) {
+      console.warn(`   ⚠️ Skipping - no polygon data`);
+      return;
+    }
+
+    let severity = "Severe";
+    let eventCode = "SV.W";
+
+    if (alert.phenomena === "TO" && alert.significance === "W") {
+      eventCode = "TO.W";
+      severity = "Extreme";
+    } else if (alert.phenomena === "SV" && alert.significance === "W") {
+      eventCode = "SV.W";
+      severity = "Severe";
+    }
+
+    const formattedAlert = {
+      id: alert.id,
+      event: alert.event,
+      eventCode: eventCode,
+      headline: alert.event,
+      description: alert.text || "",
+      instruction: "",
+      severity: severity,
+      urgency: "Immediate",
+      certainty: "Observed",
+      onset: alert.entered || new Date().toISOString(),
+      expires: alert.entered || new Date().toISOString(),
+      status: "Actual",
+      messageType: "Alert",
+      category: "Met",
+      sender: alert.cccc || "NWS",
+      senderName: alert.source || "National Weather Service",
+      sent: alert.entered || new Date().toISOString(),
+      vtecCode: alert.vtecCode,
+      phenomena: alert.phenomena,
+      significance: alert.significance,
+      polygon: {
+        type: "Polygon",
+        coordinates: [alert.polygon.map((coord) => [coord[1], coord[0]])],
+      },
+      isHistorical: true,
+    };
+
+    addAlertToMap(formattedAlert);
+    console.log(`   ✅ Alert added successfully`);
+  });
+
+  console.log(`\n${"=".repeat(60)}`);
+  console.log(
+    `✅ [MAP] Finished displaying ${alerts.length} historical warnings`
+  );
+  console.log(`${"=".repeat(60)}\n`);
+}
+
+/**
+ * Clear all historical alerts from the map
+ */
+function clearHistoricalAlerts() {
+  const targetMap = mapInstance;
+  if (!targetMap) return;
+
+  console.log("🧹 Clearing existing historical alerts...");
+
+  const layersToRemove = [];
+  const sourcesToRemove = [];
+
+  const style = targetMap.getStyle();
+  if (style && style.layers) {
+    style.layers.forEach((layer) => {
+      if (layer.id && layer.id.includes("historical")) {
+        layersToRemove.push(layer.id);
+      }
+    });
+  }
+
+  if (style && style.sources) {
+    Object.keys(style.sources).forEach((sourceId) => {
+      if (sourceId.includes("historical")) {
+        sourcesToRemove.push(sourceId);
+      }
+    });
+  }
+
+  layersToRemove.forEach((layerId) => {
+    if (targetMap.getLayer(layerId)) {
+      targetMap.removeLayer(layerId);
+    }
+  });
+
+  sourcesToRemove.forEach((sourceId) => {
+    if (targetMap.getSource(sourceId)) {
+      targetMap.removeSource(sourceId);
+    }
+  });
+
+  console.log(
+    `   Removed ${layersToRemove.length} layers, ${sourcesToRemove.length} sources`
+  );
+}
+
+/**
+ * Fetch available archive timestamps for a specific date
+ * @param {string} siteId - Radar site ID
+ * @param {string} product - Radar product code
+ * @param {string} date - Date in YYYY-MM-DD format
+ * @returns {Array} Array of timestamp objects
+ */
+async function fetchArchiveTimestamps(siteId, product, date) {
+  try {
+    const apiUrl = `http://localhost:5100/api/archive/timestamps/${siteId}?product=${product}&date=${date}`;
+    console.log(`Fetching archive timestamps via backend: ${apiUrl}`);
+
+    const response = await fetch(apiUrl);
+    if (!response.ok) {
+      throw new Error(`Archive timestamp request failed (${response.status})`);
+    }
+
+    const data = await response.json();
+    const scans = Array.isArray(data.scans) ? data.scans : [];
+
+    const timestamps = scans.map((scan) => {
+      const isoStamp = scan.timestamp;
+      const parsedDate = isoStamp ? new Date(isoStamp) : null;
+      return {
+        key: scan.key,
+        timestamp: parsedDate,
+        timeString:
+          scan.timeString ||
+          (parsedDate
+            ? `${parsedDate.toISOString().slice(11, 19)} UTC`
+            : "Unknown time"),
+        sizeBytes: scan.sizeBytes,
+        lastModified: scan.lastModified,
+        fileName: scan.fileName,
+      };
+    });
+
+    console.log(`Found ${timestamps.length} archive scans`);
+    return timestamps;
+  } catch (error) {
+    console.error("Error fetching archive timestamps:", error);
+    return [];
+  }
+}
+
+/**
+ * Load archive radar data for a specific S3 key
+ * @param {string} siteId - Radar site ID
+ * @param {string} product - Radar product code
+ * @param {string} key - S3 key for the specific radar file
+ * @param {Date} timestamp - The timestamp for archive data
+ */
+async function loadArchiveRadarData(siteId, product, key, timestamp) {
+  try {
+    console.log(`Loading archive radar: ${key}`);
+
+    const apiUrl = `http://localhost:5100/api/radar-webgl/${siteId}?product=${product}&key=${key}&format=binary`;
+    const response = await fetch(apiUrl);
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch archive radar data: ${response.statusText}`
+      );
+    }
+
+    const contentEncoding = response.headers.get("Content-Encoding");
+    let arrayBuffer;
+    if (contentEncoding === "gzip") {
+      const blob = await response.blob();
+      const decompressedStream = blob
+        .stream()
+        .pipeThrough(new DecompressionStream("gzip"));
+      const decompressedBlob = await new Response(decompressedStream).blob();
+      arrayBuffer = await decompressedBlob.arrayBuffer();
+    } else {
+      arrayBuffer = await response.arrayBuffer();
+    }
+
+    const radarData = parseBinaryRadarData(arrayBuffer);
+
+    const cacheKey = `${siteId}_${product}_${timestamp.getTime()}`;
+    archiveProductCache[cacheKey] = radarData;
+
+    if (mapInstance) {
+      updateRadarLayer(mapInstance, radarData);
+      console.log(
+        `✅ Loaded archive radar data: ${
+          radarData.vertices.length / 2
+        } vertices`
+      );
+
+      updateAllProbes();
+    } else {
+      console.warn(
+        "Map instance is not initialized; cannot render archive data."
+      );
+    }
+
+    archiveTimestamp = timestamp;
+  } catch (error) {
+    console.error("Error loading archive radar data:", error);
+    alert(`Failed to load archive data: ${error.message}`);
+  }
+}
+
 window.onload = async () => {
-  // Initialize the map
+  loadPalettesFromStorage();
+
+  loadCountiesData();
+
   mapInstance = new maplibregl.Map({
     container: "map",
-    style: `https://api.maptiler.com/maps/01977107-2c8b-7b89-873e-7e5019dbb13c/style.json?key=${MAPTILER_API_KEY}`,
-    center: [-98.585522, 39.8333333], // Center of the US
+    style: `https://api.maptiler.com/maps/01977107-2c8b-7b89-873e-7e5019dbb13c/style.json?key=SskdAs3Zk3tm9lBUtRKN&v=${Date.now()}`,
+    center: [-98.585522, 39.8333333],
     zoom: 4,
   });
-  // Ensure weather alerts initialization happens after the map instance is ready
   mapInstance.on("load", initializeWeatherAlerts);
-  mapInstance.on("click", handleMapClick);
+  mapInstance.on("mousedown", handleMapPointerDown);
+  mapInstance.on("touchstart", handleMapPointerDown);
+  mapInstance.on("mouseup", cancelMapLongPress);
+  mapInstance.on("touchend", cancelMapLongPress);
+  mapInstance.on("dragstart", cancelMapLongPress);
+  mapInstance.on("mousemove", handleMapPointerMove);
+  mapInstance.on("touchmove", handleMapPointerMove);
 
-  // Initialize the radar sites data
   const radarSites = await fetchRadarSites();
+  radarSitesCache = radarSites;
   populateRadarSitesDropdown(radarSites);
 
-  // Add radar sites to the map (this also depends on map load for source/layer)
   addRadarSitesToMap(mapInstance, radarSites);
 
-  // Create and display the color scale legend ONCE
   createColorScaleLegend();
 
-  // --- Event listeners ---
   document
     .getElementById("radarSiteSelect")
     .addEventListener("change", async (e) => {
@@ -2557,38 +4055,159 @@ window.onload = async () => {
       if (siteId) {
         selectedRadarSite = radarSites.find((site) => site.id === siteId);
 
-        // Fly to the selected radar site
+        radarSiteLocation = {
+          longitude: selectedRadarSite.longitude,
+          latitude: selectedRadarSite.latitude,
+        };
+
         mapInstance.flyTo({
           center: [selectedRadarSite.longitude, selectedRadarSite.latitude],
           zoom: 7,
           duration: 1500,
         });
 
-        // Show radar controls
-        document.querySelector(".radar-controls").style.display = "block";
+        document.getElementById("radarControlsSection").style.display = "block";
+        document.getElementById("loopSection").style.display = "block";
+        document.getElementById("tilt3DSection").style.display = "block";
 
-        // Fetch and display radar data
         startRadarPolling(mapInstance, selectedRadarSite);
       } else {
-        // Hide radar controls
-        document.querySelector(".radar-controls").style.display = "none";
+        document.getElementById("radarControlsSection").style.display = "none";
+        document.getElementById("loopSection").style.display = "none";
+        document.getElementById("tilt3DSection").style.display = "none";
 
-        // Remove radar layer and sweep effect
+        radarSiteLocation = null;
+
         removeRadarLayer(mapInstance);
         stopSweepAnimation(mapInstance);
+
+        stopLoop();
+        radarFrames = [];
       }
     });
 
   document
+    .getElementById("radarProductSelect")
+    .addEventListener("change", async (e) => {
+      const newProduct = e.target.value;
+      console.log(`Product changed to: ${newProduct}`);
+
+      selectedRadarProduct = newProduct;
+      createColorScaleLegend(newProduct);
+
+      if (
+        customRadarLayerInstance &&
+        customRadarLayerInstance.updateColorRamp
+      ) {
+        customRadarLayerInstance.updateColorRamp(newProduct);
+      }
+
+      if (isArchiveMode && archiveTimestamp && selectedRadarSite) {
+        console.log(`Reloading archive data with product: ${newProduct}`);
+
+        const cacheKey = `${
+          selectedRadarSite.id
+        }_${newProduct}_${archiveTimestamp.getTime()}`;
+
+        if (archiveProductCache[cacheKey]) {
+          console.log("Using cached archive data for new product");
+          updateRadarLayer(mapInstance, archiveProductCache[cacheKey]);
+        } else {
+          const dateStr = archiveTimestamp.toISOString().split("T")[0];
+          const timestamps = await fetchArchiveTimestamps(
+            selectedRadarSite.id,
+            newProduct,
+            dateStr
+          );
+
+          const closestTimestamp = timestamps.reduce((prev, curr) => {
+            const prevDiff = Math.abs(prev.timestamp - archiveTimestamp);
+            const currDiff = Math.abs(curr.timestamp - archiveTimestamp);
+            return currDiff < prevDiff ? curr : prev;
+          });
+
+          if (closestTimestamp) {
+            await loadArchiveRadarData(
+              selectedRadarSite.id,
+              newProduct,
+              closestTimestamp.key,
+              closestTimestamp.timestamp
+            );
+          }
+        }
+
+        return;
+      }
+
+      if (selectedRadarSite && !isArchiveMode) {
+        if (radarPollingTimer) {
+          clearInterval(radarPollingTimer);
+        }
+
+        stopLoop();
+        radarFrames = [];
+
+        await fetchAndDisplayRadarData(
+          mapInstance,
+          selectedRadarSite,
+          newProduct
+        );
+        startSweepAnimation(mapInstance, selectedRadarSite);
+
+        startRadarPolling(mapInstance, selectedRadarSite, newProduct);
+      }
+    });
+
+  document
+    .getElementById("radarProductSelect")
+    .addEventListener("change", (e) => {
+      const product = e.target.value;
+      const isVelocityProduct = product.match(/N[0-3][GVS]$/);
+      const stormControls = document.getElementById("stormMotionControls");
+      stormControls.style.display = isVelocityProduct ? "block" : "none";
+    });
+
+  document
+    .getElementById("enableStormMotion")
+    .addEventListener("change", (e) => {
+      useStormMotion = e.target.checked;
+      const inputs = document.getElementById("stormMotionInputs");
+      inputs.style.display = useStormMotion ? "block" : "none";
+
+      if (selectedRadarSite && !isArchiveMode) {
+        fetchAndDisplayRadarData(mapInstance, selectedRadarSite);
+      }
+    });
+
+  document.getElementById("stormMotionU").addEventListener("change", (e) => {
+    stormMotionU = parseFloat(e.target.value) || 0;
+    if (useStormMotion && selectedRadarSite && !isArchiveMode) {
+      fetchAndDisplayRadarData(mapInstance, selectedRadarSite);
+    }
+  });
+
+  document.getElementById("stormMotionV").addEventListener("change", (e) => {
+    stormMotionV = parseFloat(e.target.value) || 0;
+    if (useStormMotion && selectedRadarSite && !isArchiveMode) {
+      fetchAndDisplayRadarData(mapInstance, selectedRadarSite);
+    }
+  });
+
+  document
     .getElementById("refreshRadar")
     .addEventListener("click", async () => {
-      if (selectedRadarSite) {
+      if (isArchiveMode) {
+        alert("Cannot refresh while in archive mode. Exit archive mode first.");
         return;
+      }
+
+      if (selectedRadarSite) {
+        await fetchAndDisplayRadarData(mapInstance, selectedRadarSite);
+        startSweepAnimation(mapInstance, selectedRadarSite);
       }
     });
 
   document.getElementById("toggleRadar").addEventListener("click", () => {
-    // Toggle the WebGL radar data layer visibility
     if (mapInstance.getLayer(radarLayerId)) {
       const visibility = mapInstance.getLayoutProperty(
         radarLayerId,
@@ -2605,13 +4224,365 @@ window.onload = async () => {
       }
     }
   });
-};
 
-// --- Helper functions ---
+  document.getElementById("loadLoopBtn").addEventListener("click", async () => {
+    if (!selectedRadarSite) {
+      alert("Please select a radar site first.");
+      return;
+    }
+
+    const frameCount =
+      parseInt(document.getElementById("frameCount").value) || 10;
+
+    const progressDiv = document.getElementById("loadingProgress");
+    const progressText = document.getElementById("progressText");
+    const progressBar = document.getElementById("progressBar");
+    progressDiv.style.display = "block";
+
+    stopLoop();
+
+    if (isArchiveMode && archiveTimestamp) {
+      console.log("Loading archive loop frames...");
+
+      const dateStr = archiveTimestamp.toISOString().split("T")[0];
+      const timestamps = await fetchArchiveTimestamps(
+        selectedRadarSite.id,
+        selectedRadarProduct,
+        dateStr
+      );
+
+      if (timestamps.length === 0) {
+        alert("No archive timestamps available for loop");
+        progressDiv.style.display = "none";
+        return;
+      }
+
+      const currentIndex = timestamps.findIndex(
+        (t) => Math.abs(t.timestamp - archiveTimestamp) < 60000
+      );
+
+      const startIndex = Math.max(
+        0,
+        currentIndex >= 0
+          ? currentIndex - frameCount + 1
+          : timestamps.length - frameCount
+      );
+      const framesToLoad = timestamps.slice(
+        startIndex,
+        startIndex + frameCount
+      );
+
+      const downloadedFrames = [];
+      for (let i = 0; i < framesToLoad.length; i++) {
+        const ts = framesToLoad[i];
+        try {
+          const apiUrl = `http://localhost:5100/api/radar-webgl/${selectedRadarSite.id}?product=${selectedRadarProduct}&key=${ts.key}&format=binary`;
+          const response = await fetch(apiUrl);
+          const contentEncoding = response.headers.get("Content-Encoding");
+          let arrayBuffer;
+          if (contentEncoding === "gzip") {
+            const blob = await response.blob();
+            const decompressedStream = blob
+              .stream()
+              .pipeThrough(new DecompressionStream("gzip"));
+            const decompressedBlob = await new Response(
+              decompressedStream
+            ).blob();
+            arrayBuffer = await decompressedBlob.arrayBuffer();
+          } else {
+            arrayBuffer = await response.arrayBuffer();
+          }
+
+          const radarData = parseBinaryRadarData(arrayBuffer);
+
+          downloadedFrames.push({
+            data: radarData,
+            timestamp: ts.timestamp,
+            key: ts.key,
+          });
+
+          const percent = Math.round(((i + 1) / framesToLoad.length) * 100);
+          progressText.textContent = `${percent}% (${i + 1}/${
+            framesToLoad.length
+          })`;
+          if (progressBar) progressBar.style.width = `${percent}%`;
+        } catch (error) {
+          console.error(`Failed to load archive frame ${ts.key}:`, error);
+        }
+      }
+
+      radarFrames = downloadedFrames.map((frame) => {
+        const rawVertices = new Float32Array(frame.data.vertices);
+        const rawValues = new Float32Array(frame.data.values);
+        const smoothedValues = computeBilinearCornerValues(
+          rawVertices,
+          rawValues
+        );
+        const mercatorCoords = new Float32Array(rawVertices.length);
+
+        const DEG_TO_RAD = Math.PI / 180;
+        const RAD_TO_DEG = 180 / Math.PI;
+        const PI_4 = Math.PI / 4;
+        const MIN_LAT = -85.0511 * DEG_TO_RAD;
+        const MAX_LAT = 85.0511 * DEG_TO_RAD;
+
+        for (let i = 0; i < rawVertices.length; i += 2) {
+          const lng = rawVertices[i];
+          const lat = rawVertices[i + 1];
+
+          mercatorCoords[i] = (lng + 180) / 360;
+          const latRad = Math.max(MIN_LAT, Math.min(MAX_LAT, lat * DEG_TO_RAD));
+          mercatorCoords[i + 1] =
+            (180 - RAD_TO_DEG * Math.log(Math.tan(PI_4 + latRad / 2))) / 360;
+        }
+
+        return {
+          mercatorPositions: mercatorCoords,
+          rawVertices,
+          rawValues,
+          smoothedValues,
+          timestamp: frame.timestamp,
+          key: frame.key,
+          vertexCount: rawVertices.length / 2,
+        };
+      });
+
+      progressDiv.style.display = "none";
+      console.log(
+        `Loaded and pre-processed ${radarFrames.length} archive frames for loop`
+      );
+
+      if (radarFrames.length > 0) {
+        document.getElementById("loopControlsContainer").style.display = "flex";
+        document.getElementById("totalFrames").textContent = radarFrames.length;
+        displayFrame(0);
+        startLoop();
+      }
+    } else {
+      await loadRadarFrames(selectedRadarSite, frameCount, (current, total) => {
+        if (total > 0) {
+          const percent = Math.round((current / total) * 100);
+          progressText.textContent = `${percent}% (${current}/${total})`;
+          if (progressBar) progressBar.style.width = `${percent}%`;
+        } else {
+          progressDiv.style.display = "none";
+        }
+      });
+
+      progressDiv.style.display = "none";
+    }
+  });
+
+  document.getElementById("inspectorToggle").addEventListener("click", () => {
+    toggleInspector();
+  });
+
+  document
+    .getElementById("palFileInput")
+    .addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      const statusDiv = document.getElementById("palFileStatus");
+
+      if (!file) {
+        statusDiv.textContent = "";
+        return;
+      }
+
+      try {
+        statusDiv.textContent = "Loading palette...";
+        statusDiv.style.color = "rgba(255, 200, 100, 0.8)";
+
+        const text = await file.text();
+        const palette = parsePalFile(text);
+
+        if (palette.colors.length === 0) {
+          statusDiv.textContent = "⚠️ Invalid palette file";
+          statusDiv.style.color = "rgba(255, 100, 100, 0.8)";
+          return;
+        }
+
+        if (!selectedRadarProduct) {
+          statusDiv.textContent = "⚠️ Select a radar product first";
+          statusDiv.style.color = "rgba(255, 200, 100, 0.8)";
+          return;
+        }
+
+        customPalettes[selectedRadarProduct] = palette;
+
+        savePalettesToStorage();
+
+        statusDiv.textContent = `✅ Loaded palette for ${selectedRadarProduct} (${
+          palette.colors.length
+        } colors, ${palette.units || "no units"})`;
+        statusDiv.style.color = "rgba(100, 255, 150, 0.8)";
+
+        console.log(
+          `Custom palette applied to ${selectedRadarProduct}:`,
+          palette
+        );
+
+        if (selectedRadarSite) {
+          console.log(
+            `Applying custom palette to current product ${selectedRadarProduct}...`
+          );
+
+          if (
+            customRadarLayerInstance &&
+            customRadarLayerInstance.updateColorRamp
+          ) {
+            customRadarLayerInstance.updateColorRamp(selectedRadarProduct);
+          }
+
+          createColorScaleLegend(selectedRadarProduct);
+
+          statusDiv.textContent += " (Applied!)";
+        }
+      } catch (error) {
+        console.error("Error loading palette file:", error);
+        statusDiv.textContent = "❌ Error loading file";
+        statusDiv.style.color = "rgba(255, 100, 100, 0.8)";
+      }
+    });
+
+  document.getElementById("archiveRadar").addEventListener("click", () => {
+    console.log("Opening archive radar modal...");
+    const modal = document.getElementById("archiveModal");
+    modal.classList.add("active");
+
+    const now = new Date();
+    document.getElementById("archiveDate").valueAsDate = now;
+
+    document.getElementById("timestampList").style.display = "none";
+    document.getElementById("timestampLoader").style.display = "none";
+  });
+
+  document.getElementById("archiveClose").addEventListener("click", () => {
+    document.getElementById("archiveModal").classList.remove("active");
+  });
+
+  document.getElementById("archiveClearBtn").addEventListener("click", () => {
+    isArchiveMode = false;
+    archiveTimestamp = null;
+    document.getElementById("archiveModal").classList.remove("active");
+
+    const badge = document.querySelector(".archive-badge");
+    if (badge) badge.remove();
+
+    if (map.getLayer("historical-warnings-fill")) {
+      map.removeLayer("historical-warnings-fill");
+    }
+    if (map.getLayer("historical-warnings-line")) {
+      map.removeLayer("historical-warnings-line");
+    }
+    if (map.getSource("historical-warnings")) {
+      map.removeSource("historical-warnings");
+    }
+
+    initAlertFeed();
+
+    if (selectedRadarSite && selectedRadarProduct) {
+      loadRadarData(selectedRadarSite.id, selectedRadarProduct);
+    }
+  });
+
+  document
+    .getElementById("archiveFetchBtn")
+    .addEventListener("click", async () => {
+      const dateInput = document.getElementById("archiveDate").value;
+
+      if (!dateInput) {
+        alert("Please select a date");
+        return;
+      }
+
+      if (!selectedRadarSite || !selectedRadarProduct) {
+        alert("Please select a radar site and product first");
+        return;
+      }
+
+      document.getElementById("timestampLoader").style.display = "block";
+      document.getElementById("timestampList").style.display = "none";
+
+      const timestamps = await fetchArchiveTimestamps(
+        selectedRadarSite.id,
+        selectedRadarProduct,
+        dateInput
+      );
+
+      document.getElementById("timestampLoader").style.display = "none";
+
+      if (timestamps.length === 0) {
+        alert(
+          `No archive data found for ${selectedRadarSite.id} on ${dateInput}`
+        );
+        return;
+      }
+
+      const container = document.getElementById("timestampContainer");
+      container.innerHTML = "";
+
+      timestamps.forEach((ts, index) => {
+        const item = document.createElement("div");
+        item.className = "timestamp-item";
+        item.innerHTML = `
+        <span class="timestamp-time">${ts.timeString}</span>
+        <span class="timestamp-badge">#${index + 1}</span>
+      `;
+
+        item.addEventListener("click", async () => {
+          document.querySelectorAll(".timestamp-item").forEach((el) => {
+            el.classList.remove("selected");
+          });
+
+          item.classList.add("selected");
+
+          isArchiveMode = true;
+          archiveTimestamp = ts.timestamp;
+
+          document.getElementById("archiveModal").classList.remove("active");
+
+          let badge = document.querySelector(".archive-badge");
+          if (!badge) {
+            badge = document.createElement("span");
+            badge.className = "archive-badge";
+            document.querySelector(".sidebar-header h1").appendChild(badge);
+          }
+          badge.textContent = `📅 ${ts.timestamp.toLocaleString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            timeZone: "UTC",
+            timeZoneName: "short",
+          })}`;
+
+          await fetchHistoricalWarnings(ts.timestamp);
+
+          await loadArchiveRadarData(
+            selectedRadarSite.id,
+            selectedRadarProduct,
+            ts.key,
+            ts.timestamp
+          );
+        });
+
+        container.appendChild(item);
+      });
+
+      document.getElementById("timestampCount").textContent = timestamps.length;
+      document.getElementById("timestampList").style.display = "block";
+    });
+
+  document.getElementById("archiveModal").addEventListener("click", (e) => {
+    if (e.target.id === "archiveModal") {
+      document.getElementById("archiveModal").classList.remove("active");
+    }
+  });
+};
 
 async function fetchRadarSites() {
   try {
-    // Complete list of all NEXRAD radar sites in the United States without the leading "K"
     return [
       {
         id: "ABR",
@@ -3040,7 +5011,7 @@ async function fetchRadarSites() {
         longitude: -83.3131,
       },
       {
-        id: "JAN",
+        id: "DGX",
         name: "Jackson, MS",
         latitude: 32.3178,
         longitude: -90.08,
@@ -3637,132 +5608,365 @@ function addRadarSitesToMap(map, sites) {
  * Generates a Uint8Array for a 1D texture to be used as a color ramp in WebGL.
  * @param {Array} colorExpression The MapLibre color expression array.
  * @param {number} textureSize The width of the texture (e.g., 256).
- * @returns {Uint8Array} The raw pixel data for the texture.
+ * @returns {{data: Uint8Array, minValue: number, maxValue: number}} The ramp texture data and its value domain.
  */
 function generateColorRampArray(colorExpression, textureSize = 256) {
   const stops = [];
   for (let i = 3; i < colorExpression.length; i += 2) {
     const value = colorExpression[i];
     const colorStr = colorExpression[i + 1];
-    const color = colorStr.match(/(\d+(\.\d+)?)/g).map(Number);
-    color[3] = Math.round((color[3] !== undefined ? color[3] : 1.0) * 255);
-    stops.push({ value, color });
+
+    if (typeof value !== "number" || !isFinite(value)) {
+      continue;
+    }
+
+    const matches = colorStr.match(/(\d+(\.\d+)?)/g);
+    if (!matches) {
+      continue;
+    }
+
+    const [r = 0, g = 0, b = 0, a = 1] = matches.map(Number);
+    const rgba = [Math.round(r), Math.round(g), Math.round(b), 255];
+
+    stops.push({ value, color: rgba });
   }
-  if (stops.length === 0) return new Uint8Array(textureSize * 4);
-  const minDbz = 0.0;
-  const maxDbz = 95.0;
+
+  if (!stops.length) {
+    return {
+      data: new Uint8Array(textureSize * 4),
+      minValue: 0,
+      maxValue: 1,
+    };
+  }
+
+  stops.sort((a, b) => a.value - b.value);
+
+  const numericStops = stops.filter(
+    (stop) => Number.isFinite(stop.value) && stop.value < 900
+  );
+  const domainStops = numericStops.length ? numericStops : stops;
+  let minValue = domainStops[0].value;
+  let maxValue = domainStops[domainStops.length - 1].value;
+  if (minValue === maxValue) {
+    maxValue = minValue + 1;
+  }
+
   const data = new Uint8Array(textureSize * 4);
+  const denom = textureSize > 1 ? textureSize - 1 : 1;
+
   for (let i = 0; i < textureSize; i++) {
-    const dbz = minDbz + (i / (textureSize - 1)) * (maxDbz - minDbz);
-    let stop1 = stops[0],
-      stop2 = stops[stops.length - 1];
+    const sampleValue = minValue + (i / denom) * (maxValue - minValue);
+    let stop1 = stops[0];
+    let stop2 = stops[stops.length - 1];
+
     for (let j = 0; j < stops.length - 1; j++) {
-      if (dbz >= stops[j].value && dbz <= stops[j + 1].value) {
+      if (sampleValue >= stops[j].value && sampleValue <= stops[j + 1].value) {
         stop1 = stops[j];
         stop2 = stops[j + 1];
         break;
       }
     }
-    if (dbz > stop2.value) stop1 = stop2;
-    const t =
-      stop2.value - stop1.value === 0
-        ? 0
-        : (dbz - stop1.value) / (stop2.value - stop1.value);
-    const r = stop1.color[0] + t * (stop2.color[0] - stop1.color[0]);
-    const g = stop1.color[1] + t * (stop2.color[1] - stop1.color[1]);
-    const b = stop1.color[2] + t * (stop2.color[2] - stop1.color[2]);
-    const a = stop1.color[3] + t * (stop2.color[3] - stop1.color[3]);
+
+    if (sampleValue > stop2.value) {
+      stop1 = stop2;
+    }
+
+    const span = stop2.value - stop1.value;
+    const t = span === 0 ? 0 : (sampleValue - stop1.value) / span;
     const offset = i * 4;
-    data[offset] = Math.round(r);
-    data[offset + 1] = Math.round(g);
-    data[offset + 2] = Math.round(b);
-    data[offset + 3] = Math.round(a);
+
+    data[offset] = Math.round(
+      stop1.color[0] + t * (stop2.color[0] - stop1.color[0])
+    );
+    data[offset + 1] = Math.round(
+      stop1.color[1] + t * (stop2.color[1] - stop1.color[1])
+    );
+    data[offset + 2] = Math.round(
+      stop1.color[2] + t * (stop2.color[2] - stop1.color[2])
+    );
+    data[offset + 3] = Math.round(
+      stop1.color[3] + t * (stop2.color[3] - stop1.color[3])
+    );
   }
-  return data;
+
+  return { data, minValue, maxValue };
 }
 
 const RadarWebGLLayer = {
   id: radarLayerId,
   type: "custom",
-  renderingMode: "2d",
+  renderingMode: "3d",
+  currentValueRange: { min: 0, max: 95 },
 
   onAdd: function (map, gl) {
     this.map = map;
     this.gl = gl;
+    this.programValid = false;
+    this.enableSmoothing = enableSmoothing;
+    this.rawVertexLonLat = null;
+    this.rawValues = null;
+    this.smoothedValues = null;
 
-    // IMPORTANT: Capture this instance so we can call its methods later
     customRadarLayerInstance = this;
 
+    console.log("🔧 Initializing RadarWebGLLayer...");
+
     const vertexSource = `
-          uniform mat4 u_matrix;
+      precision mediump float;
+      uniform mat4 u_matrix;
           attribute vec2 a_position;
           attribute float a_dbz;
+          attribute float a_distance; // Distance from radar in meters (pre-computed)
           varying float v_dbz;
+          varying float v_distance;
+          
+          uniform float u_enable3D; // 0.0 or 1.0
+          uniform float u_beamAngle; // Beam elevation angle in radians
+          uniform float u_heightExaggeration; // Height multiplier
 
           void main() {
-              gl_Position = u_matrix * vec4(a_position, 0.0, 1.0);
+              vec2 pos = a_position;
+              float elevation = 0.0;
+              
+              // Calculate 3D elevation if enabled
+              if (u_enable3D > 0.5) {
+                  // Use pre-computed distance from radar origin
+                  float dist = a_distance;
+                  
+                  // Calculate beam height: height = distance * tan(angle)
+                  // Add Earth curvature correction: curve = distance^2 / (2 * Earth_radius)
+                  float beamHeight = dist * tan(u_beamAngle);
+                  float earthCurve = (dist * dist) / (2.0 * 6371000.0); // Earth radius in meters
+                  float actualHeight = beamHeight + earthCurve;
+                  
+                  // Apply exaggeration and convert to mercator Z
+                  elevation = actualHeight * u_heightExaggeration / 100000.0; // Scale for visibility
+              }
+              
+              gl_Position = u_matrix * vec4(pos, elevation, 1.0);
               v_dbz = a_dbz;
+              v_distance = a_distance;
           }`;
 
     const fragmentSource = `
           precision mediump float;
           varying float v_dbz;
+          varying float v_distance;
           uniform sampler2D u_color_ramp;
           uniform vec2 u_dbz_range;
+          uniform float u_enableShadows;
+          uniform float u_shadowOpacity;
+          uniform float u_enable3D;
 
           void main() {
               float normalized_dbz = (v_dbz - u_dbz_range[0]) / (u_dbz_range[1] - u_dbz_range[0]);
               normalized_dbz = clamp(normalized_dbz, 0.0, 1.0);
 
-              gl_FragColor = texture2D(u_color_ramp, vec2(normalized_dbz, 0.5));
+              vec4 color = texture2D(u_color_ramp, vec2(normalized_dbz, 0.5));
+              
+              // Apply distance-based shadow in 3D mode
+              if (u_enable3D > 0.5 && u_enableShadows > 0.5) {
+                  // Darken based on distance for depth perception
+                  float shadowFactor = 1.0 - (v_distance * u_shadowOpacity * 0.3);
+                  shadowFactor = clamp(shadowFactor, 0.7, 1.0);
+                  color.rgb *= shadowFactor;
+              }
+              
+              gl_FragColor = color;
           }`;
 
-    // --- Shader compilation with error checking ---
+    console.log("📝 Compiling vertex shader...");
     const vertexShader = gl.createShader(gl.VERTEX_SHADER);
     gl.shaderSource(vertexShader, vertexSource);
     gl.compileShader(vertexShader);
     if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
       console.error(
-        "Vertex shader compile error:",
+        "❌ Vertex shader compile error:",
         gl.getShaderInfoLog(vertexShader)
       );
+      this.programValid = false;
+      return;
     }
+    console.log("✅ Vertex shader compiled");
 
+    console.log("📝 Compiling fragment shader...");
     const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
     gl.shaderSource(fragmentShader, fragmentSource);
     gl.compileShader(fragmentShader);
     if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
       console.error(
-        "Fragment shader compile error:",
+        "❌ Fragment shader compile error:",
         gl.getShaderInfoLog(fragmentShader)
       );
+      this.programValid = false;
+      return;
     }
+    console.log("✅ Fragment shader compiled");
 
+    console.log("🔗 Linking shader program...");
     this.program = gl.createProgram();
     gl.attachShader(this.program, vertexShader);
     gl.attachShader(this.program, fragmentShader);
     gl.linkProgram(this.program);
+
     if (!gl.getProgramParameter(this.program, gl.LINK_STATUS)) {
-      console.error("Program link error:", gl.getProgramInfoLog(this.program));
+      console.error(
+        "❌ Program link error:",
+        gl.getProgramInfoLog(this.program)
+      );
+      console.error("Vertex shader log:", gl.getShaderInfoLog(vertexShader));
+      console.error(
+        "Fragment shader log:",
+        gl.getShaderInfoLog(fragmentShader)
+      );
+
+      console.warn("Attempting fallback 2D shader to keep layer functional...");
+
+      const fallbackVertex = `
+          uniform mat4 u_matrix;
+          attribute vec2 a_position;
+          attribute float a_dbz;
+          varying float v_dbz;
+          void main() {
+            v_dbz = a_dbz;
+            gl_Position = u_matrix * vec4(a_position, 0.0, 1.0);
+          }`;
+
+      const fallbackFragment = `
+          precision mediump float;
+          varying float v_dbz;
+          uniform sampler2D u_color_ramp;
+          uniform vec2 u_dbz_range;
+          void main() {
+            float normalized_dbz = (v_dbz - u_dbz_range[0]) / (u_dbz_range[1] - u_dbz_range[0]);
+            normalized_dbz = clamp(normalized_dbz, 0.0, 1.0);
+            gl_FragColor = texture2D(u_color_ramp, vec2(normalized_dbz, 0.5));
+          }`;
+
+      const fbV = gl.createShader(gl.VERTEX_SHADER);
+      gl.shaderSource(fbV, fallbackVertex);
+      gl.compileShader(fbV);
+      const fbF = gl.createShader(gl.FRAGMENT_SHADER);
+      gl.shaderSource(fbF, fallbackFragment);
+      gl.compileShader(fbF);
+
+      const fbProg = gl.createProgram();
+      gl.attachShader(fbProg, fbV);
+      gl.attachShader(fbProg, fbF);
+      gl.linkProgram(fbProg);
+      if (!gl.getProgramParameter(fbProg, gl.LINK_STATUS)) {
+        console.error(
+          "Fallback program link failed:",
+          gl.getProgramInfoLog(fbProg)
+        );
+        console.error("Fallback V log:", gl.getShaderInfoLog(fbV));
+        console.error("Fallback F log:", gl.getShaderInfoLog(fbF));
+        this.programValid = false;
+      } else {
+        this.program = fbProg;
+        this.useFallbackProgram = true;
+        this.programValid = true;
+        console.log(
+          "✅ Fallback 2D shader linked - using 2D rendering until 3D shader is fixed"
+        );
+      }
+    } else {
+      this.programValid = true;
+      console.log("✅ WebGL program compiled and linked successfully");
     }
 
-    // Get the locations of our attributes and uniforms
     this.a_pos_loc = gl.getAttribLocation(this.program, "a_position");
     this.a_dbz_loc = gl.getAttribLocation(this.program, "a_dbz");
+    this.a_distance_loc = gl.getAttribLocation(this.program, "a_distance");
     this.u_matrix_loc = gl.getUniformLocation(this.program, "u_matrix");
     this.u_color_ramp_loc = gl.getUniformLocation(this.program, "u_color_ramp");
     this.u_dbz_range_loc = gl.getUniformLocation(this.program, "u_dbz_range");
 
-    // Create the buffers for our data
+    this.u_enable3D_loc = gl.getUniformLocation(this.program, "u_enable3D");
+    this.u_beamAngle_loc = gl.getUniformLocation(this.program, "u_beamAngle");
+    this.u_heightExaggeration_loc = gl.getUniformLocation(
+      this.program,
+      "u_heightExaggeration"
+    );
+    this.u_enableShadows_loc = gl.getUniformLocation(
+      this.program,
+      "u_enableShadows"
+    );
+    this.u_shadowOpacity_loc = gl.getUniformLocation(
+      this.program,
+      "u_shadowOpacity"
+    );
+
+    if (this.a_pos_loc === -1 || this.a_dbz_loc === -1) {
+      console.error("❌ Failed to get essential attribute locations:", {
+        a_position: this.a_pos_loc,
+        a_dbz: this.a_dbz_loc,
+        a_distance: this.a_distance_loc,
+      });
+      this.programValid = false;
+      return;
+    }
+
+    this.hasDistanceAttr = this.a_distance_loc !== -1;
+
+    console.log("✅ Attribute locations:", {
+      a_position: this.a_pos_loc,
+      a_dbz: this.a_dbz_loc,
+      a_distance: this.a_distance_loc,
+      hasDistanceAttr: this.hasDistanceAttr,
+    });
+
     this.positionBuffer = gl.createBuffer();
     this.dbzBuffer = gl.createBuffer();
+    this.distanceBuffer = gl.createBuffer();
     this.vertexCount = 0;
-    this.rawData = null; // Store the raw lon/lat + dbz
-    this.mercatorPositions = null; // Store pre-computed Mercator positions
-    this.needsMercatorUpdate = true; // Flag to trigger initial Mercator calculation
+    this.rawData = null;
+    this.mercatorPositions = null;
+    this.distanceData = null;
+    this.needsMercatorUpdate = true;
 
-    // Create and load the color ramp texture
-    const colorRampData = generateColorRampArray(DBZ_COLOR_EXPRESSION, 256);
+    const vaoExt = gl.getExtension("OES_vertex_array_object");
+    if (vaoExt) {
+      this.vao = vaoExt.createVertexArrayOES();
+      this.vaoExt = vaoExt;
+      this.useVAO = true;
+      console.log("VAO support detected - using VAO for faster rendering");
+    } else {
+      this.useVAO = false;
+      console.log("VAO not supported - using standard attribute binding");
+    }
+
+    if (this.useVAO && this.vao) {
+      this.vaoExt.bindVertexArrayOES(this.vao);
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
+      if (this.a_pos_loc !== -1) {
+        gl.enableVertexAttribArray(this.a_pos_loc);
+        gl.vertexAttribPointer(this.a_pos_loc, 2, gl.FLOAT, false, 0, 0);
+      }
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.dbzBuffer);
+      if (this.a_dbz_loc !== -1) {
+        gl.enableVertexAttribArray(this.a_dbz_loc);
+        gl.vertexAttribPointer(this.a_dbz_loc, 1, gl.FLOAT, false, 0, 0);
+      }
+
+      if (this.hasDistanceAttr && this.a_distance_loc !== -1) {
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.distanceBuffer);
+        gl.enableVertexAttribArray(this.a_distance_loc);
+        gl.vertexAttribPointer(this.a_distance_loc, 1, gl.FLOAT, false, 0, 0);
+      }
+
+      this.vaoExt.bindVertexArrayOES(null);
+    }
+
+    const productInfo = getRadarProductInfo(selectedRadarProduct);
+    const {
+      data: colorRampData,
+      minValue,
+      maxValue,
+    } = generateColorRampArray(productInfo.colorExpression, 256);
+    this.currentValueRange = { min: minValue, max: maxValue };
     this.colorRampTexture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, this.colorRampTexture);
     gl.texImage2D(
@@ -3781,119 +5985,337 @@ const RadarWebGLLayer = {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
-    // Add event listener for map camera changes AFTER the layer is added
-    // This ensures we only re-calculate Mercator positions when necessary
-    // 'render' event is a good choice as it fires just before MapLibre draws the frame.
     this.map.on("render", this.onMapRendered.bind(this));
   },
 
-  // NEW METHOD: Called by map 'render' event to update Mercator positions
-  onMapRendered: function () {
-    // Only recompute and re-upload Mercator positions if flagged
-    if (this.needsMercatorUpdate && this.rawData && this.gl) {
-      console.log(
-        "Recomputing Mercator coordinates and re-uploading position buffer."
-      );
-      const gl = this.gl;
-      const vertices = this.rawData.vertices; // Raw lon/lat vertices
+  onMapRendered: function () {},
 
+  updateData: function (data) {
+    console.time("updateData-TOTAL");
+    console.log(
+      `Processing ${data ? data.vertices.length / 2 : 0} vertices...`
+    );
+    const hasData = Boolean(data && data.vertices && data.values);
+    this.vertexCount = hasData ? data.vertices.length / 2 : 0;
+    this.rawVertexLonLat = hasData ? new Float32Array(data.vertices) : null;
+    this.rawValues = hasData ? new Float32Array(data.values) : null;
+
+    if (
+      hasData &&
+      useStormMotion &&
+      radarSiteLocation &&
+      selectedRadarProduct.match(/N[0-3][GS]$/)
+    ) {
+      console.log(
+        `Calculating SRV with storm motion: U=${stormMotionU} mph, V=${stormMotionV} mph`
+      );
+      this.rawValues = calculateStormRelativeVelocity(
+        this.rawVertexLonLat,
+        this.rawValues,
+        radarSiteLocation.longitude,
+        radarSiteLocation.latitude,
+        stormMotionU,
+        stormMotionV
+      );
+    }
+
+    this.smoothedValues = null;
+    this.rawData = hasData
+      ? { vertices: this.rawVertexLonLat, values: this.rawValues }
+      : null;
+
+    if (this.gl && hasData && this.rawVertexLonLat) {
+      const gl = this.gl;
+
+      console.time("1-mercator-conversion");
+      const vertices = this.rawVertexLonLat;
       const mercatorCoords = new Float32Array(vertices.length);
-      for (let i = 0; i < vertices.length; i += 2) {
-        const merc = maplibregl.MercatorCoordinate.fromLngLat({
-          lng: vertices[i],
-          lat: vertices[i + 1],
-        });
-        mercatorCoords[i] = merc.x;
-        mercatorCoords[i + 1] = merc.y;
+      const distances = new Float32Array(vertices.length / 2);
+
+      const DEG_TO_RAD = Math.PI / 180;
+      const RAD_TO_DEG = 180 / Math.PI;
+      const PI_4 = Math.PI / 4;
+      const MIN_LAT = -85.0511 * DEG_TO_RAD;
+      const MAX_LAT = 85.0511 * DEG_TO_RAD;
+
+      const radarOriginMercator = radarSiteLocation
+        ? [
+            (radarSiteLocation.longitude + 180) / 360,
+            (180 -
+              RAD_TO_DEG *
+                Math.log(
+                  Math.tan(
+                    PI_4 +
+                      Math.max(
+                        MIN_LAT,
+                        Math.min(
+                          MAX_LAT,
+                          radarSiteLocation.latitude * DEG_TO_RAD
+                        )
+                      ) /
+                        2
+                  )
+                )) /
+              360,
+          ]
+        : [0, 0];
+
+      for (let i = 0, j = 0; i < vertices.length; i += 2, j++) {
+        const lng = vertices[i];
+        const lat = vertices[i + 1];
+
+        const mercX = (lng + 180) / 360;
+        mercatorCoords[i] = mercX;
+
+        const latRad = Math.max(MIN_LAT, Math.min(MAX_LAT, lat * DEG_TO_RAD));
+        const mercY =
+          (180 - RAD_TO_DEG * Math.log(Math.tan(PI_4 + latRad / 2))) / 360;
+        mercatorCoords[i + 1] = mercY;
+
+        if (radarSiteLocation) {
+          const dx = mercX - radarOriginMercator[0];
+          const dy = mercY - radarOriginMercator[1];
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          distances[j] = Math.min(dist * 100, 1.0);
+        } else {
+          distances[j] = 0.0;
+        }
       }
       this.mercatorPositions = mercatorCoords;
+      this.distanceData = distances;
+      console.timeEnd("1-mercator-conversion");
 
-      gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
-      // Use STATIC_DRAW because these positions only change when new radar data arrives
-      // or if the underlying projection logic somehow changes, not every frame during pan/zoom.
-      gl.bufferData(gl.ARRAY_BUFFER, this.mercatorPositions, gl.STATIC_DRAW);
-      this.needsMercatorUpdate = false; // Reset flag
+      console.time("2-buffer-upload");
+
+      const valueArray = this.getActiveValueArray() || this.rawValues;
+
+      if (this.useVAO && this.vao) {
+        this.vaoExt.bindVertexArrayOES(this.vao);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, this.mercatorPositions, gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(this.a_pos_loc);
+        gl.vertexAttribPointer(this.a_pos_loc, 2, gl.FLOAT, false, 0, 0);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.dbzBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, valueArray, gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(this.a_dbz_loc);
+        gl.vertexAttribPointer(this.a_dbz_loc, 1, gl.FLOAT, false, 0, 0);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.distanceBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, this.distanceData, gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(this.a_distance_loc);
+        gl.vertexAttribPointer(this.a_distance_loc, 1, gl.FLOAT, false, 0, 0);
+
+        this.vaoExt.bindVertexArrayOES(null);
+      } else {
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, this.mercatorPositions, gl.STATIC_DRAW);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.dbzBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, valueArray, gl.STATIC_DRAW);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.distanceBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, this.distanceData, gl.STATIC_DRAW);
+      }
+
+      console.timeEnd("2-buffer-upload");
+
+      this.needsMercatorUpdate = false;
+      this.rawData = {
+        vertices: this.rawVertexLonLat,
+        values: valueArray,
+      };
     }
-  },
 
-  // Define updateData as a direct method of the blueprint object
-  // This is called when new data comes from the server.
-  updateData: function (data) {
-    this.rawData = data; // Store the raw data
-    this.vertexCount = data ? data.vertices.length / 2 : 0;
-
-    // Update only the dBZ buffer here, as Mercator positions will be handled by onMapRendered
-    if (this.gl && data) {
-      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.dbzBuffer);
-      this.gl.bufferData(
-        this.gl.ARRAY_BUFFER,
-        new Float32Array(this.rawData.values),
-        this.gl.STATIC_DRAW
-      );
-    }
-    this.needsMercatorUpdate = true; // Signal that Mercator positions need to be recalculated
+    console.timeEnd("updateData-TOTAL");
+    console.time("3-triggerRepaint");
     if (this.map) {
       this.map.triggerRepaint();
-    } else {
-      console.warn(
-        "Map instance not available in custom layer's updateData. Cannot trigger repaint."
-      );
     }
+    console.timeEnd("3-triggerRepaint");
   },
 
-  // Define removeData as a direct method of the blueprint object
-  // Called when we want to clear the radar display without removing the layer.
   removeData: function () {
     this.rawData = null;
     this.mercatorPositions = null;
     this.vertexCount = 0;
-    this.needsMercatorUpdate = true; // Reset flag for next data load
+    this.needsMercatorUpdate = true;
+    this.rawVertexLonLat = null;
+    this.rawValues = null;
+    this.smoothedValues = null;
     if (this.map) {
       this.map.triggerRepaint();
     }
   },
 
-  // The render method remains the same, but now uses pre-calculated positions
   render: function (gl, matrix) {
+    if (!this.programValid) {
+      console.warn("Skipping render - shader program is invalid");
+      return;
+    }
+
     if (!this.mercatorPositions || this.vertexCount === 0) return;
 
     gl.useProgram(this.program);
 
-    // Set GL state for transparency
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    gl.disable(gl.DEPTH_TEST);
 
-    // Pass the map's projection matrix to the vertex shader
-    gl.uniformMatrix4fv(this.u_matrix_loc, false, matrix);
+    if (enable3DTilt) {
+      gl.enable(gl.DEPTH_TEST);
+      gl.depthFunc(gl.LEQUAL);
+    } else {
+      gl.disable(gl.DEPTH_TEST);
+    }
 
-    // Bind the *pre-computed* Mercator coordinate data (no new bufferData call here!)
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
-    gl.enableVertexAttribArray(this.a_pos_loc);
-    gl.vertexAttribPointer(this.a_pos_loc, 2, gl.FLOAT, false, 0, 0);
+    if (this.u_matrix_loc)
+      gl.uniformMatrix4fv(this.u_matrix_loc, false, matrix);
 
-    // Bind the dBZ value data (this doesn't change per frame)
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.dbzBuffer);
-    gl.enableVertexAttribArray(this.a_dbz_loc);
-    gl.vertexAttribPointer(this.a_dbz_loc, 1, gl.FLOAT, false, 0, 0);
+    if (this.u_enable3D_loc)
+      gl.uniform1f(this.u_enable3D_loc, enable3DTilt ? 1.0 : 0.0);
+    if (this.u_beamAngle_loc)
+      gl.uniform1f(this.u_beamAngle_loc, (beamElevationAngle * Math.PI) / 180);
+    if (this.u_heightExaggeration_loc)
+      gl.uniform1f(this.u_heightExaggeration_loc, tiltExaggeration);
+    if (this.u_enableShadows_loc)
+      gl.uniform1f(this.u_enableShadows_loc, enableShadows ? 1.0 : 0.0);
+    if (this.u_shadowOpacity_loc)
+      gl.uniform1f(this.u_shadowOpacity_loc, shadowOpacity);
 
-    // Bind the color ramp texture
+    if (this.useVAO && this.vao) {
+      this.vaoExt.bindVertexArrayOES(this.vao);
+    } else {
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
+      gl.enableVertexAttribArray(this.a_pos_loc);
+      gl.vertexAttribPointer(this.a_pos_loc, 2, gl.FLOAT, false, 0, 0);
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.dbzBuffer);
+      gl.enableVertexAttribArray(this.a_dbz_loc);
+      gl.vertexAttribPointer(this.a_dbz_loc, 1, gl.FLOAT, false, 0, 0);
+
+      if (this.hasDistanceAttr && this.a_distance_loc !== -1) {
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.distanceBuffer);
+        gl.enableVertexAttribArray(this.a_distance_loc);
+        gl.vertexAttribPointer(this.a_distance_loc, 1, gl.FLOAT, false, 0, 0);
+      }
+    }
+
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.colorRampTexture);
-    gl.uniform1i(this.u_color_ramp_loc, 0);
-    gl.uniform2f(this.u_dbz_range_loc, 0.0, 95.0);
+    if (this.u_color_ramp_loc) gl.uniform1i(this.u_color_ramp_loc, 0);
+    if (this.u_dbz_range_loc) {
+      const range = this.currentValueRange || { min: 0, max: 95 };
+      gl.uniform2f(this.u_dbz_range_loc, range.min, range.max);
+    }
 
-    // Draw the triangles
+    if (this.enableSmoothing || enableSmoothing) {
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      gl.blendEquation(gl.FUNC_ADD);
+    }
+
     gl.drawArrays(gl.TRIANGLES, 0, this.vertexCount);
 
-    // Good practice to reset GL state
+    if (this.useVAO && this.vao) {
+      this.vaoExt.bindVertexArrayOES(null);
+    }
+
     gl.disable(gl.BLEND);
     gl.enable(gl.DEPTH_TEST);
   },
 
-  // Add an onRemove method for cleanup
+  ensureSmoothedValues: function () {
+    if (!this.rawVertexLonLat || !this.rawValues) {
+      return null;
+    }
+    if (
+      this.smoothedValues &&
+      this.smoothedValues.length === this.rawValues.length
+    ) {
+      return this.smoothedValues;
+    }
+
+    this.smoothedValues = computeBilinearCornerValues(
+      this.rawVertexLonLat,
+      this.rawValues
+    );
+    return this.smoothedValues;
+  },
+
+  getActiveValueArray: function () {
+    if (!this.rawValues) {
+      return null;
+    }
+    const smoothingActive = this.enableSmoothing || enableSmoothing;
+    if (!smoothingActive) {
+      return this.rawValues;
+    }
+    const smoothed = this.ensureSmoothedValues();
+    return smoothed || this.rawValues;
+  },
+
+  setSmoothingEnabled: function (flag) {
+    this.enableSmoothing = flag;
+    if (!this.gl || !this.dbzBuffer || !this.rawValues) {
+      if (this.map) {
+        this.map.triggerRepaint();
+      }
+      return;
+    }
+
+    const gl = this.gl;
+    const valueArray = this.getActiveValueArray() || this.rawValues;
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.dbzBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, valueArray, gl.STATIC_DRAW);
+    this.rawData = {
+      vertices: this.rawVertexLonLat,
+      values: valueArray,
+    };
+    if (this.map) {
+      this.map.triggerRepaint();
+    }
+    updateAllProbes();
+  },
+
+  updateColorRamp: function (product) {
+    if (!this.gl || !this.colorRampTexture) {
+      console.warn("Cannot update color ramp: WebGL context not initialized");
+      return;
+    }
+
+    const gl = this.gl;
+    const productInfo = getRadarProductInfo(product);
+    const {
+      data: colorRampData,
+      minValue,
+      maxValue,
+    } = generateColorRampArray(productInfo.colorExpression, 256);
+    this.currentValueRange = { min: minValue, max: maxValue };
+
+    gl.bindTexture(gl.TEXTURE_2D, this.colorRampTexture);
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0,
+      gl.RGBA,
+      256,
+      1,
+      0,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      colorRampData
+    );
+
+    console.log(
+      `✅ Updated color ramp for product: ${product} (${productInfo.name})`
+    );
+
+    if (this.map) {
+      this.map.triggerRepaint();
+    }
+  },
+
   onRemove: function (gl) {
-    // Remove the map 'render' event listener
     if (this.map && this.onMapRendered) {
       this.map.off("render", this.onMapRendered);
     }
@@ -3901,11 +6323,17 @@ const RadarWebGLLayer = {
     if (this.program) gl.deleteProgram(this.program);
     if (this.positionBuffer) gl.deleteBuffer(this.positionBuffer);
     if (this.dbzBuffer) gl.deleteBuffer(this.dbzBuffer);
+    if (this.distanceBuffer) gl.deleteBuffer(this.distanceBuffer);
     if (this.colorRampTexture) gl.deleteTexture(this.colorRampTexture);
+
+    if (this.useVAO && this.vao && this.vaoExt) {
+      this.vaoExt.deleteVertexArrayOES(this.vao);
+    }
+
     this.rawData = null;
     this.mercatorPositions = null;
     this.vertexCount = 0;
-    customRadarLayerInstance = null; // Clear the global reference
+    customRadarLayerInstance = null;
     console.log(
       "Custom layer instance's onRemove called. WebGL resources cleaned up."
     );
@@ -3914,86 +6342,178 @@ const RadarWebGLLayer = {
 
 let lastRadarKey = null;
 let radarPollingTimer = null;
-const POLLING_INTERVAL = 15000; // 60 seconds
+const POLLING_INTERVAL = 15000;
 
-async function pollForNewRadarData(map, site, product = "N0B") {
+async function pollForNewRadarData(map, site, product) {
   console.log("Polling for new radar data...");
   try {
-    // Get the latest radar file key from the backend
+    const radarProduct = product || selectedRadarProduct;
+
     const keyResp = await fetch(
-      `http://127.0.0.1:5100/api/radar-latest-key/${site.id}?product=${product}`
+      `http://127.0.0.1:5100/api/radar-latest-key/${site.id}?product=${radarProduct}`
     );
     if (!keyResp.ok) throw new Error("Failed to check latest radar key");
     const { key } = await keyResp.json();
 
-    // If the key has changed, fetch and display new radar data
     if (key && key !== lastRadarKey) {
       lastRadarKey = key;
-      await fetchAndDisplayRadarData(map, site, product);
+      await fetchAndDisplayRadarData(map, site, radarProduct);
       startSweepAnimation(mapInstance, selectedRadarSite);
     }
-    // else: do nothing, data is unchanged
   } catch (err) {
     console.error("Radar polling error:", err);
   }
 }
 
-// Start polling for a given site
-function startRadarPolling(map, site, product = "N0B") {
-  // Clear any previous polling
+function startRadarPolling(map, site, product) {
   if (radarPollingTimer) clearInterval(radarPollingTimer);
 
-  // Poll immediately, then set interval
-  pollForNewRadarData(map, site, product);
+  const radarProduct = product || selectedRadarProduct;
+
+  pollForNewRadarData(map, site, radarProduct);
   radarPollingTimer = setInterval(() => {
-    pollForNewRadarData(map, site, product);
+    pollForNewRadarData(map, site, radarProduct);
   }, POLLING_INTERVAL);
 }
 
-async function fetchAndDisplayRadarData(map, site) {
+async function fetchAndDisplayRadarData(map, site, product) {
   try {
-    document.getElementById("loadingIndicator").style.display = "block";
-    const response = await fetch(
-      `http://127.0.0.1:5100/api/radar-webgl/${site.id}?product=N0B`
-    );
-    if (!response.ok) {
-      throw new Error(`Failed to fetch radar data: ${response.statusText}`);
+    console.time("FETCH-TOTAL");
+
+    const statusDiv = document.getElementById("sidebarStatus");
+    if (statusDiv) {
+      statusDiv.style.display = "block";
+      document.getElementById("statusText").textContent =
+        "Loading radar data...";
     }
-    const radarData = await response.json();
+
+    const radarProduct = product || selectedRadarProduct;
+
+    console.time("FETCH-request");
+    let response = await fetch(
+      `http://127.0.0.1:5100/api/radar-webgl/${site.id}?product=${radarProduct}&format=binary`
+    );
+
+    let radarData;
+    const contentType = response.headers.get("content-type");
+
+    if (
+      response.ok &&
+      contentType &&
+      contentType.includes("application/octet-stream")
+    ) {
+      console.timeEnd("FETCH-request");
+      console.time("PARSE-binary");
+
+      const contentEncoding = response.headers.get("Content-Encoding");
+      let arrayBuffer;
+
+      if (contentEncoding === "gzip") {
+        const blob = await response.blob();
+        const decompressedStream = blob
+          .stream()
+          .pipeThrough(new DecompressionStream("gzip"));
+        const decompressedBlob = await new Response(decompressedStream).blob();
+        arrayBuffer = await decompressedBlob.arrayBuffer();
+      } else {
+        arrayBuffer = await response.arrayBuffer();
+      }
+
+      radarData = parseBinaryRadarData(arrayBuffer);
+      console.timeEnd("PARSE-binary");
+      console.log(
+        "✅ Using fast binary format" +
+          (contentEncoding === "gzip" ? " (gzip)" : "")
+      );
+    } else {
+      console.timeEnd("FETCH-request");
+      console.log("⚠️ Binary format not available, using JSON fallback");
+
+      response = await fetch(
+        `http://127.0.0.1:5100/api/radar-webgl/${site.id}?product=${radarProduct}`
+      );
+      if (!response.ok) {
+        throw new Error(`Failed to fetch radar data: ${response.statusText}`);
+      }
+
+      console.time("PARSE-json");
+      radarData = await response.json();
+      console.timeEnd("PARSE-json");
+    }
+
+    console.timeEnd("FETCH-TOTAL");
     console.log(
       `Received ${radarData.vertices.length / 2} vertices for WebGL rendering.`
     );
+
+    console.time("UPDATE-radar-layer");
     updateRadarLayer(map, radarData);
+    console.timeEnd("UPDATE-radar-layer");
+
+    updateAllProbes();
+
     updateRadarInfo(site);
     document.getElementById("radarLegend").style.display = "block";
   } catch (error) {
     console.error("Error fetching or rendering WebGL radar data:", error);
     alert(`Error loading radar data: ${error.message}`);
   } finally {
-    document.getElementById("loadingIndicator").style.display = "none";
+    const statusDiv = document.getElementById("sidebarStatus");
+    if (statusDiv) {
+      statusDiv.style.display = "none";
+    }
   }
 }
 
-// THIS IS THE NEW updateRadarLayer function
+function parseBinaryRadarData(arrayBuffer) {
+  const view = new DataView(arrayBuffer);
+  let offset = 0;
+
+  const vertexCount = view.getUint32(offset, true);
+  offset += 4;
+
+  const verticesLength = vertexCount * 2;
+  const vertices = new Float32Array(arrayBuffer, offset, verticesLength);
+  offset += verticesLength * 4;
+
+  const values = new Float32Array(arrayBuffer, offset, vertexCount);
+
+  return {
+    vertices: vertices,
+    values: values,
+  };
+}
 function updateRadarLayer(map, data) {
-  // If the custom layer instance hasn't been added yet, add it
   if (!customRadarLayerInstance) {
-    const firstSymbolId = map
+    const beforeLayerId = map
       .getStyle()
-      .layers.find((l) => l.type === "symbol")?.id;
-    map.addLayer(RadarWebGLLayer, firstSymbolId);
-    // After `map.addLayer`, `RadarWebGLLayer.onAdd` will be called,
-    // which then sets `customRadarLayerInstance = this;`
+      .layers.find(
+        (l) =>
+          l.type === "line" &&
+          (l.id.includes("Road") ||
+            l.id.includes("Transit") ||
+            l.id.includes("Path") ||
+            l.id.includes("Railway"))
+      )?.id;
+
+    if (beforeLayerId) {
+      map.addLayer(RadarWebGLLayer, beforeLayerId);
+    } else {
+      const symbolLayerId = map
+        .getStyle()
+        .layers.find((l) => l.type === "symbol")?.id;
+      map.addLayer(RadarWebGLLayer, symbolLayerId);
+    }
+
+    ensureAlertOutlinesAboveRadar(undefined, map);
   }
 
-  // Now, call updateData on the globally stored instance
   if (
     customRadarLayerInstance &&
     typeof customRadarLayerInstance.updateData === "function"
   ) {
     customRadarLayerInstance.updateData(data);
   } else {
-    // This case should ideally not happen if onAdd successfully sets customRadarLayerInstance
     console.error(
       "Custom radar layer instance or its updateData method not available. This indicates an issue during layer initialization."
     );
@@ -4001,20 +6521,18 @@ function updateRadarLayer(map, data) {
 }
 
 function removeRadarLayer(map) {
-  // If we have a reference to the instance, call its removeData method for cleanup
   if (
     customRadarLayerInstance &&
     typeof customRadarLayerInstance.removeData === "function"
   ) {
-    customRadarLayerInstance.removeData(); // Clear data immediately
+    customRadarLayerInstance.removeData();
   }
 
-  // Then remove the layer itself from the map, which will trigger onRemove
   if (map.getLayer(radarLayerId)) {
     map.removeLayer(radarLayerId);
   }
   document.getElementById("radarLegend").style.display = "none";
-  document.getElementById("toggleRadar").textContent = "Show Radar"; // Correct text after hiding
+  document.getElementById("toggleRadar").textContent = "Show Radar";
 }
 
 function updateRadarInfo(site) {
@@ -4041,103 +6559,171 @@ function updateRadarInfo(site) {
   }
 }
 
-function createColorScaleLegend() {
-  const legendDiv = document.getElementById("legendScale");
+function buildLegendMeta(productCode, productInfo) {
+  const unitLabel = productInfo.unit || "";
 
-  // Use the existing color expression data
-  const dbzColorExpression = DBZ_COLOR_EXPRESSION.slice(3); // Skip the "interpolate", "linear", ["get", "dbz"] parts
-
-  // Extract all values and colors for gradient stops
-  const gradientStops = [];
-  const labeledValues = [];
-
-  // Use a smaller step to get enough values for a detailed legend
-  for (let i = 0; i < dbzColorExpression.length; i += 2) {
-    const value = dbzColorExpression[i];
-    const color = dbzColorExpression[i + 1];
-
-    // Calculate percentage for gradient stop
-    const percentage = (value / 95) * 100;
-    gradientStops.push(`${color} ${percentage.toFixed(1)}%`);
-
-    // Add labels at regular intervals
-    if (value % 20 === 0 || value === 0) {
-      labeledValues.push({ value, percentage });
-    }
+  if (productInfo.isVelocity) {
+    const strongThreshold = Math.round(20 * MS_TO_MPH);
+    const calmThreshold = Math.round(10 * MS_TO_MPH);
+    return {
+      subtitle: "Radial wind speed relative to the radar beam",
+      leftLabel: "Inbound - greens",
+      rightLabel: "Outbound - reds",
+      footnote:
+        "Pair inbound/outbound couplets to spot rotation. Purple indicates range folding.",
+      badges: [
+        {
+          label: "Inbound",
+          range: unitLabel
+            ? `<= -${strongThreshold} ${unitLabel}`
+            : "Toward radar",
+          description: "Air moving toward the radar (teals/greens)",
+          color: "rgba(90, 220, 170, 0.6)",
+        },
+        {
+          label: "Calm / shear",
+          range: unitLabel
+            ? `-${calmThreshold} to +${calmThreshold} ${unitLabel}`
+            : "Near zero",
+          description: "Weak winds or shear zone (grays)",
+          color: "rgba(205, 210, 222, 0.65)",
+        },
+        {
+          label: "Outbound",
+          range: unitLabel
+            ? `>= +${strongThreshold} ${unitLabel}`
+            : "Away from radar",
+          description: "Air moving away from the radar (reds/pinks)",
+          color: "rgba(255, 140, 140, 0.65)",
+        },
+        {
+          label: "Range fold",
+          range: "RF flagged",
+          description: "Purple = ambiguous velocity data",
+          color: "rgba(185, 132, 255, 0.65)",
+        },
+      ],
+    };
   }
 
-  // Create a gradient string
-  const gradientString = gradientStops.join(", ");
+  return {
+    subtitle: "Intensity of precipitation cores and debris",
+    leftLabel: "Light rain / snow",
+    rightLabel: "Extreme hail / debris",
+    footnote: "Reflectivity above 55 dBZ often signals severe hail or debris.",
+    badges: [
+      {
+        label: "Light",
+        range: unitLabel ? `< 25 ${unitLabel}` : "Light",
+        description: "Sprinkles, flurries, virga",
+        color: "rgba(99, 211, 255, 0.55)",
+      },
+      {
+        label: "Moderate",
+        range: unitLabel ? `25-40 ${unitLabel}` : "Moderate",
+        description: "Steady rain or melting snow",
+        color: "rgba(120, 214, 190, 0.6)",
+      },
+      {
+        label: "Heavy",
+        range: unitLabel ? `40-55 ${unitLabel}` : "Heavy",
+        description: "Torrential rain, small hail",
+        color: "rgba(255, 190, 120, 0.65)",
+      },
+      {
+        label: "Extreme",
+        range: unitLabel ? `> 55 ${unitLabel}` : "Extreme",
+        description: "Giant hail, debris signatures",
+        color: "rgba(255, 120, 120, 0.7)",
+      },
+    ],
+  };
+}
 
-  // Create HTML for the legend
-  let html = `
-    <div style="
-      padding: 12px;
-      border-radius: 10px;
-      background: var(--glass-bg);
-      box-shadow: var(--glass-shadow);
-      border: 1px solid var(--glass-border);
-      backdrop-filter: blur(8px);
-      width: 280px;
-    ">
-      <div style="
-        font-size: 14px;
-        color: var(--text-primary);
-        margin-bottom: 8px;
-        font-weight: 500;
-        text-align: center;
-      ">Radar Reflectivity (dBZ)</div>
-      
-      <!-- Gradient bar -->
-      <div style="
-        height: 24px;
-        width: 100%;
-        background: linear-gradient(to right, ${gradientString});
-        border-radius: 4px;
-        position: relative;
-        margin-bottom: 16px;
-      "></div>
-      
-      <!-- Value markers -->
-      <div style="
-        position: relative;
-        height: 20px;
-        width: 100%;
-        display: flex;
-        justify-content: space-between;
-      ">`;
+function createColorScaleLegend(productCode = selectedRadarProduct) {
+  const legendDiv = document.getElementById("legendScale");
+  if (!legendDiv) {
+    return;
+  }
 
-  // Add tick marks and labels
-  labeledValues.forEach(({ value, percentage }) => {
-    html += `
-      <div style="
-        position: absolute;
-        left: ${percentage}%;
-        transform: translateX(-50%);
-        text-align: center;
-        color: var(--text-secondary);
-        font-size: 12px;
-      ">
-        <div style="
-          height: 6px;
-          width: 1px;
-          background-color: rgba(255,255,255,0.5);
-          margin: 0 auto 4px;
-        "></div>
-        ${value}
-      </div>`;
-  });
+  const productInfo = getRadarProductInfo(productCode);
+  const expressionStops = productInfo.colorExpression.slice(3);
+  const gradientStops = [];
+  const values = [];
 
-  html += `</div>
-    </div>`;
+  for (let i = 0; i < expressionStops.length; i += 2) {
+    const value = expressionStops[i];
+    const color = expressionStops[i + 1];
+
+    if (typeof value !== "number" || !isFinite(value) || value >= 900) {
+      continue;
+    }
+
+    gradientStops.push({ value, color });
+    values.push(value);
+  }
+
+  let gradientCSS = "linear-gradient(90deg, #0f172a, #020617)";
+  if (gradientStops.length) {
+    const minValue = Math.min(...values);
+    const maxValue = Math.max(...values);
+    const range = maxValue - minValue === 0 ? 1 : maxValue - minValue;
+
+    const stopsString = gradientStops
+      .map(({ value, color }) => {
+        const pct = ((value - minValue) / range) * 100;
+        const clamped = Math.max(0, Math.min(100, pct));
+        return `${color} ${clamped.toFixed(2)}%`;
+      })
+      .join(", ");
+
+    gradientCSS = `linear-gradient(90deg, ${stopsString})`;
+  }
+
+  const legendMeta = buildLegendMeta(productCode, productInfo);
+  const badgesHtml = (legendMeta.badges || [])
+    .map(
+      (badge) => `
+        <div class="legend-badge" style="--badge-color: ${badge.color};">
+          <span class="legend-badge__label">${badge.label}</span>
+          <span class="legend-badge__range">${badge.range}</span>
+          <span class="legend-badge__description">${badge.description}</span>
+        </div>`
+    )
+    .join("");
+
+  const subtitle = legendMeta.subtitle || "";
+  const footnote = legendMeta.footnote || "";
+  const leftLabel = legendMeta.leftLabel || "";
+  const rightLabel = legendMeta.rightLabel || "";
+
+  const html = `
+    <div class="legend-card">
+      <div class="legend-header">
+        <div>
+          <div class="legend-label">Radar Product</div>
+          <h4 class="legend-title">${productCode} - ${productInfo.name}</h4>
+          <p class="legend-subtitle">${subtitle}</p>
+        </div>
+        <span class="legend-pill">${productInfo.unit || ""}</span>
+      </div>
+      <div class="legend-gradient">
+        <div class="legend-gradient__bar" style="background: ${gradientCSS};"></div>
+        <div class="legend-gradient__minmax">
+          <span>${leftLabel}</span>
+          <span>${rightLabel}</span>
+        </div>
+      </div>
+      ${badgesHtml ? `<div class="legend-badges">${badgesHtml}</div>` : ""}
+      ${footnote ? `<p class="legend-footnote">${footnote}</p>` : ""}
+    </div>
+  `;
 
   legendDiv.innerHTML = html;
 }
 
-// --- NEW SWEEP ANIMATION FUNCTIONS ---
-
 function startSweepAnimation(map, site) {
-  stopSweepAnimation(map); // Ensure any previous animation is stopped
+  stopSweepAnimation(map);
   const center = [site.longitude, site.latitude];
   if (!map.getSource(sweepSourceId)) {
     map.addSource(sweepSourceId, {
@@ -4152,7 +6738,6 @@ function startSweepAnimation(map, site) {
         type: "fill",
         source: sweepSourceId,
         paint: {
-          // Use a gradient color for the fill
           "fill-color": [
             "interpolate",
             ["linear"],
@@ -4168,7 +6753,7 @@ function startSweepAnimation(map, site) {
           "fill-opacity": 0.5,
         },
       },
-      radarLayerId // Place it below the actual radar data
+      radarLayerId
     );
   }
 
@@ -4183,7 +6768,7 @@ function startSweepAnimation(map, site) {
       SWEEP_RADIUS_KM,
       startAngle,
       endAngle,
-      { steps: SWEEP_ARC_STEPS * 2, units: "kilometers" } // Increase steps for smoother arc
+      { steps: SWEEP_ARC_STEPS * 2, units: "kilometers" }
     );
     const sweepPolygon = turf.polygon([
       [center, ...arc.geometry.coordinates, center],
@@ -4205,4 +6790,1083 @@ function stopSweepAnimation(map) {
   if (map.getSource(sweepSourceId)) {
     map.removeSource(sweepSourceId);
   }
+}
+
+let radarFrames = [];
+let currentFrameIndex = 0;
+let loopAnimationFrameId = null;
+let isLooping = false;
+let lastFrameTime = 0;
+let endPauseDuration = 1000;
+let isPaused = false;
+let pauseStartTime = 0;
+
+const MAX_PARALLEL_DOWNLOADS = 6;
+
+/**
+ * OPTIMIZED: Fetches list of available radar files for a given date
+ * Uses streamlined XML parsing for faster results
+ */
+async function fetchAvailableRadarFiles(siteId, product, date = new Date()) {
+  const radarProduct = product || selectedRadarProduct;
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const datePrefix = `${year}_${month}_${day}`;
+
+  const prefix = `${siteId}_${radarProduct}_${datePrefix}`;
+  const url = `${NEXRAD_BUCKET_URL}/?prefix=${prefix}`;
+
+  console.time("fetch-file-list");
+  console.log(`📡 Fetching radar file list from: ${url}`);
+
+  try {
+    const response = await fetch(url);
+    const xmlText = await response.text();
+
+    const keyRegex = /<Key>([^<]+)<\/Key>/g;
+    const timestampRegex = /<LastModified>([^<]+)<\/LastModified>/g;
+
+    const keys = [];
+    const timestamps = [];
+
+    let match;
+    while ((match = keyRegex.exec(xmlText)) !== null) {
+      keys.push(match[1]);
+    }
+    while ((match = timestampRegex.exec(xmlText)) !== null) {
+      timestamps.push(new Date(match[1]));
+    }
+
+    const files = keys.map((key, i) => ({
+      key: key,
+      timestamp: timestamps[i],
+      url: `${NEXRAD_BUCKET_URL}/${key}`,
+    }));
+
+    files.sort((a, b) => a.timestamp - b.timestamp);
+
+    console.timeEnd("fetch-file-list");
+    console.log(`✅ Found ${files.length} radar files`);
+    return files;
+  } catch (error) {
+    console.error("❌ Error fetching radar file list:", error);
+    throw error;
+  }
+}
+
+/**
+ * OPTIMIZED: Downloads a single frame with error handling
+ * Returns null on failure instead of throwing
+ */
+async function downloadSingleFrame(site, file, index, total, product) {
+  try {
+    const radarProduct = product || selectedRadarProduct;
+
+    const response = await fetch(
+      `http://127.0.0.1:5100/api/radar-webgl/${
+        site.id
+      }?product=${radarProduct}&format=binary&key=${encodeURIComponent(
+        file.key
+      )}`,
+      {
+        cache: "force-cache",
+      }
+    );
+
+    if (!response.ok) {
+      console.warn(
+        `⚠️ Failed to load frame ${index + 1}/${total}: ${response.status}`
+      );
+      return null;
+    }
+
+    const contentType = response.headers.get("content-type");
+    let radarData;
+
+    if (contentType && contentType.includes("application/octet-stream")) {
+      const contentEncoding = response.headers.get("Content-Encoding");
+      let arrayBuffer;
+      if (contentEncoding === "gzip") {
+        const blob = await response.blob();
+        const decompressedStream = blob
+          .stream()
+          .pipeThrough(new DecompressionStream("gzip"));
+        const decompressedBlob = await new Response(decompressedStream).blob();
+        arrayBuffer = await decompressedBlob.arrayBuffer();
+      } else {
+        arrayBuffer = await response.arrayBuffer();
+      }
+
+      radarData = parseBinaryRadarData(arrayBuffer);
+    } else {
+      radarData = await response.json();
+    }
+
+    return {
+      data: radarData,
+      timestamp: file.timestamp,
+      key: file.key,
+    };
+  } catch (error) {
+    console.error(`❌ Error loading frame ${index + 1}/${total}:`, error);
+    return null;
+  }
+}
+
+/**
+ * OPTIMIZED: Downloads frames in parallel batches for maximum speed
+ * Uses Promise.allSettled for resilient parallel downloads
+ */
+async function downloadFramesBatch(
+  site,
+  files,
+  progressCallback = null,
+  product = null
+) {
+  const batches = [];
+
+  const radarProduct = product || selectedRadarProduct;
+
+  for (let i = 0; i < files.length; i += MAX_PARALLEL_DOWNLOADS) {
+    batches.push(files.slice(i, i + MAX_PARALLEL_DOWNLOADS));
+  }
+
+  const allFrames = [];
+  let loadedCount = 0;
+
+  console.log(
+    `📦 Downloading ${files.length} frames in ${batches.length} parallel batches (${MAX_PARALLEL_DOWNLOADS} at a time)`
+  );
+
+  for (const batch of batches) {
+    const promises = batch.map((file, batchIndex) => {
+      const globalIndex = loadedCount + batchIndex;
+      return downloadSingleFrame(
+        site,
+        file,
+        globalIndex,
+        files.length,
+        radarProduct
+      );
+    });
+
+    const results = await Promise.allSettled(promises);
+
+    const successfulFrames = results
+      .filter((r) => r.status === "fulfilled" && r.value !== null)
+      .map((r) => r.value);
+
+    allFrames.push(...successfulFrames);
+    loadedCount += batch.length;
+
+    if (progressCallback) {
+      progressCallback(loadedCount, files.length);
+    }
+
+    console.log(
+      `✅ Batch complete: ${successfulFrames.length}/${batch.length} frames loaded (${allFrames.length}/${files.length} total)`
+    );
+  }
+
+  return allFrames;
+}
+
+/**
+ * OPTIMIZED: Loads multiple radar frames with parallel downloads and pre-processing
+ * Significantly faster than sequential loading
+ */
+async function loadRadarFrames(
+  site,
+  frameCount = 10,
+  progressCallback = null,
+  product = null
+) {
+  console.time("TOTAL-LOAD-TIME");
+
+  try {
+    const statusDiv = document.getElementById("sidebarStatus");
+    if (statusDiv) {
+      statusDiv.style.display = "block";
+      document.getElementById("statusText").textContent =
+        "Loading animation frames...";
+    }
+
+    const radarProduct = product || selectedRadarProduct;
+
+    const availableFiles = await fetchAvailableRadarFiles(
+      site.id,
+      radarProduct
+    );
+
+    if (availableFiles.length === 0) {
+      alert("No radar data available for this site and date.");
+      return;
+    }
+
+    const filesToLoad = availableFiles.slice(-frameCount);
+    console.log(
+      `� Starting parallel download of ${filesToLoad.length} frames...`
+    );
+
+    radarFrames = [];
+
+    console.time("parallel-download");
+    const downloadedFrames = await downloadFramesBatch(
+      site,
+      filesToLoad,
+      progressCallback,
+      radarProduct
+    );
+    console.timeEnd("parallel-download");
+
+    if (downloadedFrames.length === 0) {
+      alert("Failed to load any radar frames. Please try again.");
+      return;
+    }
+
+    console.time("pre-process-frames");
+    radarFrames = downloadedFrames.map((frame) => {
+      const rawVertices = new Float32Array(frame.data.vertices);
+      const rawValues = new Float32Array(frame.data.values);
+      const smoothedValues = computeBilinearCornerValues(
+        rawVertices,
+        rawValues
+      );
+      const mercatorCoords = new Float32Array(rawVertices.length);
+
+      const DEG_TO_RAD = Math.PI / 180;
+      const RAD_TO_DEG = 180 / Math.PI;
+      const PI_4 = Math.PI / 4;
+      const MIN_LAT = -85.0511 * DEG_TO_RAD;
+      const MAX_LAT = 85.0511 * DEG_TO_RAD;
+
+      for (let i = 0; i < rawVertices.length; i += 2) {
+        const lng = rawVertices[i];
+        const lat = rawVertices[i + 1];
+
+        mercatorCoords[i] = (lng + 180) / 360;
+        const latRad = Math.max(MIN_LAT, Math.min(MAX_LAT, lat * DEG_TO_RAD));
+        mercatorCoords[i + 1] =
+          (180 - RAD_TO_DEG * Math.log(Math.tan(PI_4 + latRad / 2))) / 360;
+      }
+
+      return {
+        mercatorPositions: mercatorCoords,
+        rawVertices,
+        rawValues,
+        smoothedValues,
+        timestamp: frame.timestamp,
+        key: frame.key,
+        vertexCount: rawVertices.length / 2,
+      };
+    });
+    console.timeEnd("pre-process-frames");
+
+    console.log(
+      `✅ Successfully loaded and pre-processed ${radarFrames.length} frames`
+    );
+    console.timeEnd("TOTAL-LOAD-TIME");
+
+    console.log("Updating UI with frame count:", radarFrames.length);
+
+    document.getElementById("totalFrames").textContent = radarFrames.length;
+    const loopControlsContainer = document.getElementById(
+      "loopControlsContainer"
+    );
+    loopControlsContainer.style.display = "flex";
+
+    console.log("loopControlsContainer display set to flex");
+
+    currentFrameIndex = 0;
+    displayFrameFast(currentFrameIndex);
+
+    console.log("Loop is ready! Click play button to start animation.");
+  } catch (error) {
+    console.error("❌ Error loading radar frames:", error);
+    alert(`Error loading radar frames: ${error.message}`);
+  } finally {
+    const statusDiv = document.getElementById("sidebarStatus");
+    if (statusDiv) {
+      statusDiv.style.display = "none";
+    }
+    if (progressCallback) {
+      progressCallback(0, 0);
+    }
+  }
+}
+
+/**
+ * OPTIMIZED: Ultra-fast frame display using pre-computed mercator coords
+ * Bypasses expensive coordinate conversion - just updates GPU buffers
+ */
+function displayFrameFast(frameIndex) {
+  if (frameIndex < 0 || frameIndex >= radarFrames.length) {
+    return;
+  }
+
+  currentFrameIndex = frameIndex;
+  const frame = radarFrames[frameIndex];
+  const smoothingActive =
+    (customRadarLayerInstance && customRadarLayerInstance.enableSmoothing) ||
+    enableSmoothing;
+  const frameValues =
+    smoothingActive && frame.smoothedValues
+      ? frame.smoothedValues
+      : frame.rawValues;
+
+  if (customRadarLayerInstance && customRadarLayerInstance.gl) {
+    const gl = customRadarLayerInstance.gl;
+
+    if (customRadarLayerInstance.useVAO && customRadarLayerInstance.vao) {
+      customRadarLayerInstance.vaoExt.bindVertexArrayOES(
+        customRadarLayerInstance.vao
+      );
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, customRadarLayerInstance.positionBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, frame.mercatorPositions, gl.STATIC_DRAW);
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, customRadarLayerInstance.dbzBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, frameValues, gl.STATIC_DRAW);
+
+      customRadarLayerInstance.vaoExt.bindVertexArrayOES(null);
+    } else {
+      gl.bindBuffer(gl.ARRAY_BUFFER, customRadarLayerInstance.positionBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, frame.mercatorPositions, gl.STATIC_DRAW);
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, customRadarLayerInstance.dbzBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, frameValues, gl.STATIC_DRAW);
+    }
+
+    customRadarLayerInstance.vertexCount = frame.vertexCount;
+    customRadarLayerInstance.mercatorPositions = frame.mercatorPositions;
+    customRadarLayerInstance.rawVertexLonLat = frame.rawVertices;
+    customRadarLayerInstance.rawValues = frame.rawValues;
+    customRadarLayerInstance.smoothedValues = frame.smoothedValues;
+    customRadarLayerInstance.rawData = {
+      vertices: frame.rawVertices,
+      values: frameValues,
+    };
+
+    if (mapInstance) {
+      mapInstance.triggerRepaint();
+    }
+  }
+
+  updateAllProbes();
+
+  document.getElementById("currentFrame").textContent = frameIndex + 1;
+
+  updateRadarInfoWithTimestamp(selectedRadarSite, frame.timestamp);
+}
+
+/**
+ * OPTIMIZED: requestAnimationFrame-based loop for smooth 60fps animation
+ * Much smoother than setInterval
+ */
+function startLoop() {
+  console.log(
+    "startLoop called. radarFrames.length:",
+    radarFrames.length,
+    "isLooping:",
+    isLooping
+  );
+
+  if (radarFrames.length === 0) {
+    console.warn("Cannot start loop: no frames loaded");
+    alert('Please load frames first by clicking "Load Animation Loop"');
+    return;
+  }
+
+  if (isLooping) {
+    console.warn("Loop already running");
+    return;
+  }
+
+  isLooping = true;
+  isPaused = false;
+  document.getElementById("playPauseBtn").textContent = "⏸️";
+  document.getElementById("playPauseBtn").title = "Pause";
+
+  console.log("Loop started successfully");
+
+  const loopSpeed = parseInt(document.getElementById("loopSpeed").value);
+  lastFrameTime = performance.now();
+
+  const animate = (currentTime) => {
+    if (!isLooping) return;
+
+    if (isPaused) {
+      const pauseElapsed = currentTime - pauseStartTime;
+      if (pauseElapsed >= endPauseDuration) {
+        isPaused = false;
+        lastFrameTime = currentTime;
+      } else {
+        loopAnimationFrameId = requestAnimationFrame(animate);
+        return;
+      }
+    }
+
+    const elapsed = currentTime - lastFrameTime;
+
+    if (elapsed >= loopSpeed) {
+      currentFrameIndex = (currentFrameIndex + 1) % radarFrames.length;
+      displayFrameFast(currentFrameIndex);
+      lastFrameTime = currentTime - (elapsed % loopSpeed);
+
+      if (
+        currentFrameIndex === radarFrames.length - 1 &&
+        endPauseDuration > 0
+      ) {
+        isPaused = true;
+        pauseStartTime = currentTime;
+      }
+    }
+
+    loopAnimationFrameId = requestAnimationFrame(animate);
+  };
+
+  loopAnimationFrameId = requestAnimationFrame(animate);
+}
+
+/**
+ * OPTIMIZED: Stops the animation loop
+ */
+function stopLoop() {
+  if (!isLooping) {
+    return;
+  }
+
+  isLooping = false;
+  document.getElementById("playPauseBtn").textContent = "▶️";
+  document.getElementById("playPauseBtn").title = "Play";
+
+  if (loopAnimationFrameId) {
+    cancelAnimationFrame(loopAnimationFrameId);
+    loopAnimationFrameId = null;
+  }
+}
+
+/**
+ * Toggles play/pause for the animation loop
+ */
+function toggleLoop() {
+  console.log(
+    "toggleLoop called. isLooping:",
+    isLooping,
+    "radarFrames.length:",
+    radarFrames.length
+  );
+  if (isLooping) {
+    stopLoop();
+  } else {
+    startLoop();
+  }
+}
+
+/**
+ * Updates radar info with specific timestamp
+ */
+function updateRadarInfoWithTimestamp(site, timestamp) {
+  try {
+    const infoDiv = document.querySelector(".radar-info");
+    const dateOptions = {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    };
+    const formattedDate = timestamp.toLocaleDateString("en-US", dateOptions);
+
+    const productInfo = getRadarProductInfo(selectedRadarProduct);
+
+    let html = `
+      <strong>Radar Site:</strong> ${site.id} - ${site.name}<br>
+      <strong>Rendered with:</strong> WebGL Custom Layer<br>
+      <strong>Time:</strong> ${formattedDate}<br>
+      <strong>Product:</strong> ${selectedRadarProduct} (${productInfo.name})<br>
+    `;
+    infoDiv.innerHTML = html;
+  } catch (error) {
+    console.error("Error updating radar info:", error);
+  }
+}
+
+/**
+ * Toggle the inspector tool on/off
+ */
+function toggleInspector() {
+  inspectorEnabled = !inspectorEnabled;
+
+  const toggleBtn = document.getElementById("inspectorToggle");
+  const display = document.getElementById("inspectorDisplay");
+
+  if (inspectorEnabled) {
+    toggleBtn.classList.add("active");
+    mapInstance.getCanvas().style.cursor = "crosshair";
+
+    inspectorMouseHandler = (e) => handleInspectorMove(e);
+    mapInstance.on("mousemove", inspectorMouseHandler);
+  } else {
+    toggleBtn.classList.remove("active");
+    display.classList.remove("active");
+    mapInstance.getCanvas().style.cursor = "";
+
+    if (inspectorMouseHandler) {
+      mapInstance.off("mousemove", inspectorMouseHandler);
+      inspectorMouseHandler = null;
+    }
+  }
+}
+
+/**
+ * Handle mouse movement for inspector tool
+ */
+function handleInspectorMove(e) {
+  if (
+    !inspectorEnabled ||
+    !customRadarLayerInstance ||
+    !customRadarLayerInstance.rawData
+  ) {
+    return;
+  }
+
+  const display = document.getElementById("inspectorDisplay");
+
+  const lngLat = e.lngLat;
+
+  const radarValue = sampleRadarAtPoint(lngLat.lng, lngLat.lat);
+
+  updateInspectorDisplay(radarValue, lngLat, e.point);
+
+  display.classList.add("active");
+}
+
+/**
+ * Sample radar data at a specific lat/lng point
+ */
+function sampleRadarAtPoint(lng, lat) {
+  if (!customRadarLayerInstance || !customRadarLayerInstance.rawData) {
+    return null;
+  }
+
+  const data = customRadarLayerInstance.rawData;
+  const vertices = data.vertices;
+  const values = data.values;
+
+  if (!vertices || !values || vertices.length === 0) {
+    return null;
+  }
+
+  let minDist = Infinity;
+  let closestValue = null;
+
+  for (let i = 0; i < vertices.length; i += 2) {
+    const vLng = vertices[i];
+    const vLat = vertices[i + 1];
+
+    const dx = vLng - lng;
+    const dy = vLat - lat;
+    const dist = dx * dx + dy * dy;
+
+    if (dist < minDist) {
+      minDist = dist;
+      closestValue = values[i / 2];
+    }
+  }
+
+  if (minDist < 0.0025) {
+    return closestValue;
+  }
+
+  return null;
+}
+
+/**
+ * Update inspector display panel
+ */
+function updateInspectorDisplay(value, lngLat, screenPoint) {
+  const display = document.getElementById("inspectorDisplay");
+  const valueEl = document.getElementById("inspectorValue");
+  const unitEl = document.getElementById("inspectorUnit");
+  const coordsEl = document.getElementById("inspectorCoords");
+
+  const productInfo = getRadarProductInfo(selectedRadarProduct);
+
+  if (value !== null && !isNaN(value)) {
+    let displayValue = value.toFixed(1);
+    let interpretation = "";
+
+    if (productInfo.isVelocity) {
+      const velocityMph = value * MS_TO_MPH;
+      displayValue = velocityMph.toFixed(1);
+      const strongThreshold = 20 * MS_TO_MPH;
+      const moderateThreshold = 5 * MS_TO_MPH;
+
+      if (velocityMph < -strongThreshold) {
+        interpretation = "Strong inbound";
+      } else if (velocityMph < -moderateThreshold) {
+        interpretation = "Moderate inbound";
+      } else if (velocityMph < moderateThreshold) {
+        interpretation = "Calm/Near zero";
+      } else if (velocityMph < strongThreshold) {
+        interpretation = "Moderate outbound";
+      } else {
+        interpretation = "Strong outbound";
+      }
+    } else {
+      if (value < 20) {
+        interpretation = "Light";
+      } else if (value < 35) {
+        interpretation = "Moderate";
+      } else if (value < 50) {
+        interpretation = "Heavy";
+      } else {
+        interpretation = "Extreme";
+      }
+    }
+
+    valueEl.innerHTML = `${displayValue}<span style="font-size: 0.6em; margin-left: 4px; opacity: 0.7;">${interpretation}</span>`;
+    unitEl.textContent = productInfo.unit;
+  } else {
+    valueEl.innerHTML = '<span class="inspector-no-data">No data</span>';
+    unitEl.textContent = "";
+  }
+
+  coordsEl.innerHTML = `
+    Lat: ${lngLat.lat.toFixed(4)}°<br>
+    Lon: ${lngLat.lng.toFixed(4)}°
+  `;
+
+  const offset = 20;
+  let left = screenPoint.x + offset;
+  let top = screenPoint.y + offset;
+
+  const displayRect = display.getBoundingClientRect();
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+
+  if (left + displayRect.width > viewportWidth - 20) {
+    left = screenPoint.x - displayRect.width - offset;
+  }
+
+  if (top + displayRect.height > viewportHeight - 20) {
+    top = screenPoint.y - displayRect.height - offset;
+  }
+
+  display.style.left = left + "px";
+  display.style.top = top + "px";
+}
+
+function displayFrame(frameIndex) {
+  displayFrameFast(frameIndex);
+}
+
+/**
+ * Toggle the probe tool on/off
+ */
+function toggleProbeTool() {
+  probeToolEnabled = !probeToolEnabled;
+
+  const toggleBtn = document.getElementById("probeToggle");
+
+  if (probeToolEnabled) {
+    toggleBtn.classList.add("active");
+    mapInstance.getCanvas().style.cursor = "crosshair";
+
+    mapInstance.on("click", handleProbeClick);
+  } else {
+    toggleBtn.classList.remove("active");
+    mapInstance.getCanvas().style.cursor = "";
+
+    mapInstance.off("click", handleProbeClick);
+  }
+}
+
+/**
+ * Handle map click to place a probe marker
+ */
+function handleProbeClick(e) {
+  if (!probeToolEnabled) return;
+
+  const lngLat = e.lngLat;
+  const probeId = ++probeIdCounter;
+
+  const radarValue = sampleRadarAtPoint(lngLat.lng, lngLat.lat);
+
+  const el = document.createElement("div");
+  el.className = "probe-marker";
+  el.innerHTML = `
+    <div class="probe-marker__pin">📍</div>
+    <div class="probe-marker__label">Probe ${probeId}</div>
+  `;
+  el.style.cursor = "move";
+
+  const marker = new maplibregl.Marker({
+    element: el,
+    draggable: true,
+  })
+    .setLngLat([lngLat.lng, lngLat.lat])
+    .addTo(mapInstance);
+
+  const popup = createProbePopup(probeId, radarValue, lngLat);
+  marker.setPopup(popup);
+  popup.addTo(mapInstance);
+
+  const probe = {
+    id: probeId,
+    marker: marker,
+    popup: popup,
+    lngLat: { lng: lngLat.lng, lat: lngLat.lat },
+    lastValue: typeof radarValue === "number" ? radarValue : null,
+  };
+  probeMarkers.push(probe);
+
+  marker.on("drag", () => {
+    const newLngLat = marker.getLngLat();
+    probe.lngLat = newLngLat;
+    const newValue = sampleRadarAtPoint(newLngLat.lng, newLngLat.lat);
+    updateProbePopup(probe, newValue);
+  });
+
+  setTimeout(() => {
+    const closeBtn = document.querySelector(
+      `.probe-popup-${probeId} .probe-popup__close`
+    );
+    if (closeBtn) {
+      closeBtn.addEventListener("click", () => {
+        removeProbe(probeId);
+      });
+    }
+  }, 100);
+
+  console.log(`Placed probe ${probeId} at`, lngLat);
+}
+
+/**
+ * Create a popup for a probe with radar data
+ */
+function createProbePopup(probeId, radarValue, lngLat) {
+  const productInfo = getRadarProductInfo(selectedRadarProduct);
+
+  let valueDisplay, interpretation;
+  if (radarValue !== null) {
+    valueDisplay = radarValue.toFixed(1);
+
+    if (
+      selectedRadarProduct.includes("G") ||
+      selectedRadarProduct.includes("S")
+    ) {
+      const velocityMph = radarValue * MS_TO_MPH;
+      interpretation =
+        velocityMph < -20
+          ? "Strong inbound"
+          : velocityMph < -5
+          ? "Moderate inbound"
+          : velocityMph < 5
+          ? "Calm"
+          : velocityMph < 20
+          ? "Moderate outbound"
+          : "Strong outbound";
+    } else {
+      interpretation =
+        radarValue < 20
+          ? "Light"
+          : radarValue < 35
+          ? "Moderate"
+          : radarValue < 50
+          ? "Heavy"
+          : "Extreme";
+    }
+  } else {
+    valueDisplay = "--";
+    interpretation = "No data";
+  }
+
+  const content = `
+    <div class="probe-popup probe-popup-${probeId}">
+      <div class="probe-popup__header">
+        <span class="probe-popup__title">Probe ${probeId}</span>
+        <button class="probe-popup__close">×</button>
+      </div>
+      <div class="probe-popup__body">
+        <div class="probe-popup__value">${valueDisplay} <span class="probe-popup__unit">${
+    productInfo.unit
+  }</span></div>
+        <div class="probe-popup__interpretation">${interpretation}</div>
+        <div class="probe-popup__coords">
+          ${lngLat.lat.toFixed(4)}°, ${lngLat.lng.toFixed(4)}°
+        </div>
+      </div>
+    </div>
+  `;
+
+  return new maplibregl.Popup({
+    closeButton: false,
+    closeOnClick: false,
+    offset: 25,
+    className: "probe-popup-container",
+  }).setHTML(content);
+}
+
+const PROBE_SMOOTHING_ALPHA = 0.35;
+
+function smoothProbeValue(previousValue, nextValue) {
+  if (typeof nextValue !== "number" || !isFinite(nextValue)) {
+    return null;
+  }
+  if (typeof previousValue !== "number" || !isFinite(previousValue)) {
+    return nextValue;
+  }
+  return previousValue + (nextValue - previousValue) * PROBE_SMOOTHING_ALPHA;
+}
+
+/**
+ * Update probe popup with new radar value
+ */
+function updateProbePopup(probe, radarValue) {
+  const productInfo = getRadarProductInfo(selectedRadarProduct);
+
+  const numericValue =
+    typeof radarValue === "number" && isFinite(radarValue) ? radarValue : null;
+  const smoothedValue = smoothProbeValue(probe.lastValue, numericValue);
+  let valueDisplay;
+  let interpretation;
+
+  if (smoothedValue !== null) {
+    probe.lastValue = smoothedValue;
+    valueDisplay = smoothedValue.toFixed(1);
+
+    if (
+      selectedRadarProduct.includes("G") ||
+      selectedRadarProduct.includes("S")
+    ) {
+      const velocityMph = smoothedValue * MS_TO_MPH;
+      interpretation =
+        velocityMph < -20
+          ? "Strong inbound"
+          : velocityMph < -5
+          ? "Moderate inbound"
+          : velocityMph < 5
+          ? "Calm"
+          : velocityMph < 20
+          ? "Moderate outbound"
+          : "Strong outbound";
+    } else {
+      interpretation =
+        smoothedValue < 20
+          ? "Light"
+          : smoothedValue < 35
+          ? "Moderate"
+          : smoothedValue < 50
+          ? "Heavy"
+          : "Extreme";
+    }
+  } else {
+    valueDisplay = "--";
+    interpretation = "No data";
+  }
+
+  const valueEl = document.querySelector(
+    `.probe-popup-${probe.id} .probe-popup__value`
+  );
+  const interpEl = document.querySelector(
+    `.probe-popup-${probe.id} .probe-popup__interpretation`
+  );
+  const coordsEl = document.querySelector(
+    `.probe-popup-${probe.id} .probe-popup__coords`
+  );
+
+  if (valueEl) {
+    valueEl.innerHTML = `${valueDisplay} <span class="probe-popup__unit">${productInfo.unit}</span>`;
+  }
+  if (interpEl) {
+    interpEl.textContent = interpretation;
+  }
+  if (coordsEl) {
+    coordsEl.textContent = `${probe.lngLat.lat.toFixed(
+      4
+    )}°, ${probe.lngLat.lng.toFixed(4)}°`;
+  }
+}
+
+/**
+ * Remove a probe by ID
+ */
+function removeProbe(probeId) {
+  const index = probeMarkers.findIndex((p) => p.id === probeId);
+  if (index !== -1) {
+    const probe = probeMarkers[index];
+    probe.marker.remove();
+    if (probe.popup) probe.popup.remove();
+    probeMarkers.splice(index, 1);
+    console.log(`Removed probe ${probeId}`);
+  }
+}
+
+/**
+ * Update all probe values (called when radar data changes)
+ */
+function updateAllProbes() {
+  probeMarkers.forEach((probe) => {
+    const newValue = sampleRadarAtPoint(probe.lngLat.lng, probe.lngLat.lat);
+    updateProbePopup(probe, newValue);
+  });
+}
+
+document.getElementById("enable3DTilt").addEventListener("change", (e) => {
+  enable3DTilt = e.target.checked;
+
+  const controlsDiv = document.getElementById("tilt3DControls");
+  controlsDiv.style.display = enable3DTilt ? "block" : "none";
+
+  if (mapInstance) {
+    mapInstance.triggerRepaint();
+  }
+
+  console.log(`3D Tilt Mode: ${enable3DTilt ? "ENABLED" : "DISABLED"}`);
+});
+
+document.getElementById("beamElevation").addEventListener("input", (e) => {
+  beamElevationAngle = parseFloat(e.target.value);
+  document.getElementById(
+    "beamElevationValue"
+  ).textContent = `${beamElevationAngle}°`;
+
+  if (mapInstance) {
+    mapInstance.triggerRepaint();
+  }
+});
+
+document.getElementById("tiltExaggeration").addEventListener("input", (e) => {
+  tiltExaggeration = parseInt(e.target.value);
+  document.getElementById(
+    "tiltExaggerationValue"
+  ).textContent = `${tiltExaggeration}x`;
+
+  if (mapInstance) {
+    mapInstance.triggerRepaint();
+  }
+});
+
+document.getElementById("enableShadows").addEventListener("change", (e) => {
+  enableShadows = e.target.checked;
+
+  if (mapInstance) {
+    mapInstance.triggerRepaint();
+  }
+
+  console.log(`Shadows: ${enableShadows ? "ENABLED" : "DISABLED"}`);
+});
+
+document.getElementById("shadowOpacity").addEventListener("input", (e) => {
+  const value = parseInt(e.target.value);
+  shadowOpacity = value / 100.0;
+  document.getElementById("shadowOpacityValue").textContent = `${value}%`;
+
+  if (mapInstance) {
+    mapInstance.triggerRepaint();
+  }
+});
+
+document
+  .getElementById("enableAlertFlashing")
+  .addEventListener("change", (e) => {
+    enableAlertFlashing = e.target.checked;
+
+    if (enableAlertFlashing) {
+      startAlertFlashing();
+      console.log("Alert flashing: ENABLED");
+    } else {
+      stopAlertFlashing();
+      activeAlerts.forEach((alert) => {
+        if (!mapInstance || !alert.mapLayerId) return;
+        const fillLayerId = `${alert.mapLayerId}-fill`;
+        if (mapInstance.getLayer(fillLayerId)) {
+          mapInstance.setPaintProperty(fillLayerId, "fill-opacity", 0.25);
+        }
+      });
+      console.log("Alert flashing: DISABLED");
+    }
+  });
+
+console.log("Setting up playPauseBtn event listener");
+const playPauseBtn = document.getElementById("playPauseBtn");
+if (playPauseBtn) {
+  console.log("playPauseBtn found, adding click listener");
+  playPauseBtn.addEventListener("click", () => {
+    console.log("playPauseBtn clicked!");
+    toggleLoop();
+  });
+} else {
+  console.error("playPauseBtn not found!");
+}
+
+document.getElementById("loopSpeed").addEventListener("input", (e) => {
+  const speed = parseInt(e.target.value);
+  document.getElementById("loopSpeedValue").textContent = `${speed}ms`;
+
+  if (isLooping) {
+    stopLoop();
+    startLoop();
+  }
+});
+
+document.getElementById("endPauseDuration").addEventListener("input", (e) => {
+  endPauseDuration = parseInt(e.target.value);
+  document.getElementById(
+    "endPauseDurationValue"
+  ).textContent = `${endPauseDuration}ms`;
+});
+
+document.getElementById("frameCount").addEventListener("change", async (e) => {
+  const newCount = parseInt(e.target.value);
+  if (newCount < 2 || newCount > 30) {
+    alert("Frame count must be between 2 and 30");
+    e.target.value = 10;
+    return;
+  }
+
+  if (selectedRadarSite) {
+    await loadRadarFrames(selectedRadarSite, newCount);
+  }
+});
+
+const inspectorToggleBtn = document.getElementById("inspector-toggle");
+if (inspectorToggleBtn) {
+  inspectorToggleBtn.addEventListener("click", toggleInspector);
+  console.log("Inspector toggle event listener added");
+} else {
+  console.warn("Inspector toggle button not found");
+}
+
+const probeToggleBtn = document.getElementById("probeToggle");
+if (probeToggleBtn) {
+  probeToggleBtn.addEventListener("click", toggleProbeTool);
+  console.log("Probe tool toggle event listener added");
+} else {
+  console.warn("Probe tool toggle button not found");
+}
+
+const smoothingToggle = document.getElementById("enableSmoothing");
+if (smoothingToggle) {
+  smoothingToggle.addEventListener("change", (e) => {
+    enableSmoothing = e.target.checked;
+    console.log(`Smoothing: ${enableSmoothing ? "ENABLED" : "DISABLED"}`);
+
+    if (
+      customRadarLayerInstance &&
+      typeof customRadarLayerInstance.setSmoothingEnabled === "function"
+    ) {
+      customRadarLayerInstance.setSmoothingEnabled(enableSmoothing);
+    } else if (mapInstance) {
+      mapInstance.triggerRepaint();
+    }
+  });
+  console.log("Smoothing toggle event listener added");
+} else {
+  console.warn("Smoothing toggle not found");
 }
