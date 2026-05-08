@@ -138,6 +138,13 @@
         pointer-events: none;
       }
 
+      body.detached-controls-active .bottom-dock,
+      body.detached-controls-active .radar-quick-panel,
+      body.detached-controls-active .inspector-display,
+      body.detached-controls-active .draw-panel {
+        display: none !important;
+      }
+
       .bottom-panel {
         position: fixed;
         background: var(--bg-soft);
@@ -3054,6 +3061,16 @@
           </button>
           <button
             class="inspector-toggle btn-icon"
+            id="openDetachedControlsBtn"
+            title="Open Detached Controls"
+            aria-label="Open Detached Controls"
+          >
+            <span class="inspector-toggle-icon" aria-hidden="true">
+              <i data-lucide="monitor-up"></i>
+            </span>
+          </button>
+          <button
+            class="inspector-toggle btn-icon"
             id="inspectorToggle"
             title="Inspect"
           >
@@ -3091,10 +3108,6 @@
         </div>
 
         <div class="tool-toggles">
-          <label class="check-row" title="TVS Detection">
-            <i class="fas fa-tornado"></i>
-            <input type="checkbox" id="tvsDetectionToggle" />
-          </label>
           <label class="check-row" title="Flash Warnings">
             <i class="fas fa-triangle-exclamation"></i>
             <input type="checkbox" id="enableAlertFlashing" checked />

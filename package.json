@@ -1,4 +1,17 @@
 {
+  "name": "radarapp",
+  "version": "1.0.0",
+  "description": "Radar desktop app with bundled API",
+  "main": "main.js",
+  "author": "Ryder",
+  "license": "UNLICENSED",
+  "scripts": {
+    "dev:web": "nodemon server.js",
+    "dev:electron": "electron .",
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder --win nsis"
+  },
   "dependencies": {
     "body-parser": "^1.20.2",
     "dashjs": "^5.0.4",
@@ -8,12 +21,50 @@
     "nexrad-level-3-data": "^0.6.1"
   },
   "devDependencies": {
+    "electron": "^29.0.0",
+    "electron-builder": "^24.13.3",
     "nodemon": "^3.0.1"
   },
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js",
-    "setup": "npm install",
-    "dev": "nodemon server.js"
+  "build": {
+    "appId": "com.ryder.radarapp",
+    "productName": "RadarApp",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "server.js",
+      "app.js",
+      "index.html",
+      "alertIconMap.js",
+      "nexrad-processor.js",
+      "counties.geojson",
+      "uscities.csv",
+      "table.pal",
+      "Doppler.png",
+      "src/**/*",
+      "js/**/*",
+      "cameras/**/*",
+      "scripts/**/*",
+      "package.json",
+      "node_modules/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "bin/radar-api.exe",
+        "to": "bin/radar-api.exe"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "RadarApp-Setup-${version}.exe"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false
+    }
   }
 }

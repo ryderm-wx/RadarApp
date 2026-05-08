@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Radar Controls Mirror</title>
+    <style id="mirrorStyles">
+      :root {
+        color-scheme: dark;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        overflow: auto;
+        padding: 56px 14px 16px;
+        background:
+          radial-gradient(
+            1200px 500px at 20% -20%,
+            rgba(70, 128, 220, 0.2),
+            transparent
+          ),
+          radial-gradient(
+            1000px 420px at 100% 0%,
+            rgba(48, 195, 165, 0.18),
+            transparent
+          ),
+          #070a10;
+        font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
+      }
+
+      .mirror-header {
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        z-index: 3000;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 999px;
+        padding: 7px 12px;
+        background: rgba(6, 10, 16, 0.82);
+        color: rgba(255, 255, 255, 0.82);
+        font:
+          600 12px/1.1 "Space Grotesk",
+          "IBM Plex Sans",
+          sans-serif;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      #mirrorRoot {
+        max-width: 1100px;
+        margin: 0 auto;
+        display: grid;
+        gap: 12px;
+      }
+
+      #mirrorRoot > * {
+        min-width: 0;
+      }
+
+      #map {
+        display: none !important;
+      }
+
+      #radarLegend,
+      #statusBar,
+      #archiveModal,
+      #timestampList,
+      #timestampLoader {
+        display: none !important;
+      }
+
+      #openDetachedControlsBtn {
+        display: none !important;
+      }
+
+      .bottom-dock {
+        position: static !important;
+        inset: auto !important;
+        pointer-events: auto !important;
+      }
+
+      .bottom-panel.bottom-left.radar-menu-panel {
+        position: static !important;
+        left: auto !important;
+        right: auto !important;
+        width: auto !important;
+        bottom: auto !important;
+        transform: none !important;
+        max-height: none !important;
+        border-radius: 16px !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3) !important;
+      }
+
+      .bottom-panel.bottom-left.radar-menu-panel.is-hidden {
+        display: block !important;
+      }
+
+      .bottom-panel.bottom-center {
+        position: static !important;
+        left: auto !important;
+        right: auto !important;
+        bottom: auto !important;
+        transform: none !important;
+        width: auto !important;
+        border-radius: 16px !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3) !important;
+      }
+
+      .radar-quick-panel {
+        position: static !important;
+        left: auto !important;
+        right: auto !important;
+        top: auto !important;
+        width: auto !important;
+        border-radius: 16px !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28) !important;
+      }
+
+      #radarMenuPanel #siteDock {
+        margin: 0;
+      }
+
+      #radarMenuPanel .dock-summary {
+        position: sticky;
+        top: 0;
+        background: rgba(7, 12, 19, 0.95);
+        border-radius: 12px;
+        padding: 8px 10px;
+        z-index: 5;
+      }
+
+      #radarMenuPanel .dock-content {
+        margin-top: 10px;
+        gap: 10px;
+        max-height: 56vh;
+        overflow: auto;
+        padding-right: 4px;
+      }
+
+      #radarMenuPanel .dock-section {
+        border-radius: 12px;
+      }
+
+      #radarMenuPanel .control-section {
+        border-radius: 12px;
+      }
+
+      #radarMenuPanel .button-group {
+        flex-wrap: wrap;
+      }
+
+      .bottom-panel.bottom-center .tool-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .bottom-panel.bottom-center .tool-toggles {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      @media (max-width: 760px) {
+        body {
+          padding: 52px 10px 12px;
+        }
+
+        .bottom-panel.bottom-center .tool-grid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .bottom-panel.bottom-center .tool-toggles {
+          grid-template-columns: 1fr;
+        }
+
+        #radarMenuPanel .dock-content {
+          max-height: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="mirror-header" id="syncStatus">Connecting</div>
+
+    <script>
+      const CHANNEL_NAME = "radar-detached-controls-v1";
+      const CONTROL_SELECTORS = [
+        "#radarQuickPanel button[data-product]",
+        "#radarTimelineScrubber",
+        "#radarMenuPanel #siteDock input",
+        "#radarMenuPanel #siteDock select",
+        "#radarMenuPanel #siteDock button",
+        ".bottom-panel.bottom-center .tool-grid button",
+        ".bottom-panel.bottom-center .tool-toggles input",
+        "#radarControlsSection input",
+      ];
+
+      const channel =
+        "BroadcastChannel" in window
+          ? new BroadcastChannel(CHANNEL_NAME)
+          : null;
+      const syncStatus = document.getElementById("syncStatus");
+
+      let mainTemplateLoaded = false;
+      let controlsByKey = new Map();
+
+      function setStatus(text) {
+        syncStatus.textContent = text;
+      }
+
+      function getKey(element) {
+        if (!element) return "";
+        if (element.id) return `id:${element.id}`;
+        if (element.matches("#radarQuickProducts button[data-product]")) {
+          return `quick-product:${String(element.dataset.product || "").toUpperCase()}`;
+        }
+        return "";
+      }
+
+      function findElementByKey(key) {
+        if (!key) return null;
+        if (key.startsWith("id:")) {
+          return document.getElementById(key.slice(3));
+        }
+        if (key.startsWith("quick-product:")) {
+          const product = key.slice("quick-product:".length).toUpperCase();
+          return document.querySelector(
+            `#radarQuickProducts button[data-product="${product}"]`,
+          );
+        }
+        return null;
+      }
+
+      function sendAction(payload) {
+        if (!channel) return;
+        channel.postMessage({ type: "control-action", payload });
+      }
+
+      function collectMirrorControls() {
+        controlsByKey = new Map();
+        CONTROL_SELECTORS.forEach((selector) => {
+          document.querySelectorAll(selector).forEach((element) => {
+            const key = getKey(element);
+            if (!key) return;
+            controlsByKey.set(key, element);
+          });
+        });
+      }
+
+      function upsertSelectOptions(selectElement, options) {
+        if (
+          !(selectElement instanceof HTMLSelectElement) ||
+          !Array.isArray(options)
+        ) {
+          return;
+        }
+
+        const current = Array.from(selectElement.options).map((option) => ({
+          value: option.value,
+          label: option.textContent || option.value,
+        }));
+        const next = options.map((option) => ({
+          value: String(option.value),
+          label: String(option.label || option.value),
+        }));
+
+        if (JSON.stringify(current) === JSON.stringify(next)) {
+          return;
+        }
+
+        selectElement.innerHTML = "";
+        next.forEach((option) => {
+          const item = document.createElement("option");
+          item.value = option.value;
+          item.textContent = option.label;
+          selectElement.appendChild(item);
+        });
+      }
+
+      function applySnapshot(payload) {
+        if (!payload || !Array.isArray(payload.controls)) {
+          return;
+        }
+
+        payload.controls.forEach((descriptor) => {
+          const key = String(descriptor.key || "");
+          const state =
+            payload.state && payload.state[key] ? payload.state[key] : {};
+          const element = controlsByKey.get(key) || findElementByKey(key);
+          if (!element) return;
+
+          controlsByKey.set(key, element);
+          element.disabled = Boolean(state.disabled);
+
+          if (element instanceof HTMLSelectElement) {
+            upsertSelectOptions(element, descriptor.options || []);
+          }
+
+          if (element instanceof HTMLInputElement) {
+            if (typeof descriptor.min !== "undefined") {
+              element.min = String(descriptor.min);
+            }
+            if (typeof descriptor.max !== "undefined") {
+              element.max = String(descriptor.max);
+            }
+            if (typeof descriptor.step !== "undefined") {
+              element.step = String(descriptor.step);
+            }
+          }
+
+          if (element instanceof HTMLInputElement) {
+            if (element.type === "checkbox") {
+              element.checked = Boolean(state.checked);
+            } else if (typeof state.value !== "undefined") {
+              element.value = String(state.value);
+            }
+          } else if (
+            (element instanceof HTMLSelectElement ||
+              element instanceof HTMLTextAreaElement) &&
+            typeof state.value !== "undefined"
+          ) {
+            element.value = String(state.value);
+          } else if (element instanceof HTMLButtonElement) {
+            element.classList.toggle("is-active", Boolean(state.active));
+            element.classList.toggle("active", Boolean(state.active));
+            if (typeof state.html === "string") {
+              element.innerHTML = state.html;
+            }
+            if (typeof state.title === "string") {
+              element.setAttribute("title", state.title);
+            }
+          }
+
+          const row =
+            element.closest(
+              ".dock-toggle-row, .dock-field, .control-group, .check-row",
+            ) || element;
+          if (row && typeof state.hidden === "boolean") {
+            row.style.opacity = state.hidden ? "0.5" : "1";
+          }
+
+          if (
+            element instanceof HTMLInputElement &&
+            element.type === "checkbox"
+          ) {
+            const checkRow = element.closest(".check-row");
+            if (checkRow) {
+              checkRow.classList.toggle("is-active", element.checked);
+            }
+          }
+        });
+
+        if (window.lucide && typeof window.lucide.createIcons === "function") {
+          window.lucide.createIcons();
+        }
+
+        setStatus("Synced");
+      }
+
+      function bindInteractionForwarding() {
+        document.addEventListener(
+          "click",
+          (event) => {
+            const button = event.target && event.target.closest("button");
+            if (!button) return;
+
+            const key = getKey(button);
+            if (!key) return;
+
+            event.preventDefault();
+            sendAction({ key, action: "click" });
+          },
+          true,
+        );
+
+        const forwardValue = (event) => {
+          const target = event.target;
+          if (!target) return;
+
+          const key = getKey(target);
+          if (!key) return;
+
+          if (
+            target instanceof HTMLInputElement &&
+            target.type === "checkbox"
+          ) {
+            sendAction({ key, action: "set", checked: target.checked });
+            return;
+          }
+
+          if (
+            target instanceof HTMLInputElement ||
+            target instanceof HTMLSelectElement ||
+            target instanceof HTMLTextAreaElement
+          ) {
+            sendAction({ key, action: "set", value: target.value });
+          }
+        };
+
+        document.addEventListener("input", forwardValue, true);
+        document.addEventListener("change", forwardValue, true);
+      }
+
+      async function loadMainTemplate() {
+        const response = await fetch("/index.html", { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error(`Template fetch failed: ${response.status}`);
+        }
+
+        const html = await response.text();
+        const parser = new DOMParser();
+        const parsed = parser.parseFromString(html, "text/html");
+
+        parsed.querySelectorAll('link[rel="stylesheet"]').forEach((link) => {
+          const href = link.getAttribute("href");
+          if (!href) return;
+          if (document.head.querySelector(`link[href="${href}"]`)) return;
+
+          const cloned = document.createElement("link");
+          cloned.rel = "stylesheet";
+          cloned.href = href;
+          document.head.appendChild(cloned);
+        });
+
+        const styleTag = parsed.querySelector("style");
+        if (styleTag) {
+          const mirrorStyles = document.getElementById("mirrorStyles");
+          const cloned = document.createElement("style");
+          cloned.textContent = styleTag.textContent || "";
+          document.head.insertBefore(cloned, mirrorStyles);
+        }
+
+        const mirrorRoot = document.createElement("div");
+        mirrorRoot.id = "mirrorRoot";
+
+        const fragment = document.createDocumentFragment();
+        ["radarQuickPanel", "radarMenuPanel"].forEach((id) => {
+          const node = parsed.getElementById(id);
+          if (node) fragment.appendChild(node);
+        });
+
+        const bottomCenter = parsed.querySelector(
+          ".bottom-panel.bottom-center",
+        );
+        if (bottomCenter) {
+          const wrap = document.createElement("div");
+          wrap.className = "bottom-dock";
+          wrap.appendChild(bottomCenter);
+          fragment.appendChild(wrap);
+        }
+
+        mirrorRoot.appendChild(fragment);
+        document.body.appendChild(mirrorRoot);
+
+        const menuPanel = document.getElementById("radarMenuPanel");
+        if (menuPanel) {
+          menuPanel.querySelectorAll("details").forEach((detailsEl) => {
+            if (detailsEl.id !== "siteDock") {
+              detailsEl.open = false;
+            }
+          });
+        }
+
+        const lucideScript = document.createElement("script");
+        lucideScript.src =
+          "https://unpkg.com/lucide@0.475.0/dist/umd/lucide.min.js";
+        lucideScript.async = true;
+        lucideScript.onload = () => {
+          if (
+            window.lucide &&
+            typeof window.lucide.createIcons === "function"
+          ) {
+            window.lucide.createIcons();
+          }
+        };
+        document.body.appendChild(lucideScript);
+
+        mainTemplateLoaded = true;
+        collectMirrorControls();
+      }
+
+      async function initialize() {
+        try {
+          await loadMainTemplate();
+          bindInteractionForwarding();
+        } catch (error) {
+          setStatus("UI load failed");
+          console.error(error);
+          return;
+        }
+
+        if (!channel) {
+          setStatus("Broadcast unavailable");
+          return;
+        }
+
+        channel.onmessage = (event) => {
+          const message = event && event.data;
+          if (!message || typeof message !== "object") return;
+
+          if (message.type === "controls-snapshot") {
+            applySnapshot(message.payload);
+          }
+        };
+
+        channel.postMessage({ type: "popup-ready" });
+        channel.postMessage({ type: "request-snapshot" });
+        setInterval(() => {
+          channel.postMessage({ type: "request-snapshot" });
+        }, 1000);
+
+        if (mainTemplateLoaded) {
+          setStatus("Waiting for sync");
+        }
+      }
+
+      initialize();
+    </script>
+  </body>
+</html>

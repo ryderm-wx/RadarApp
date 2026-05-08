@@ -106,8 +106,31 @@ const UI_SCALE_MAX = 1.0;
 const UI_SCALE_MOBILE_BREAKPOINT = 900;
 
 const THEME_STORAGE_KEY = "radar-ui-theme";
+const DETACHED_CONTROL_CHANNEL_NAME = "radar-detached-controls-v1";
+const DETACHED_CONTROL_POPUP_NAME = "RadarDetachedControls";
+const DETACHED_CONTROL_POPUP_URL = "/controls";
+const DETACHED_CONTROL_POPUP_FEATURES =
+  "popup=yes,width=460,height=900,resizable=yes,scrollbars=yes";
+const DETACHED_CONTROL_TARGET_SELECTORS = [
+  "#radarQuickPanel button[data-product]",
+  "#radarTimelineScrubber",
+  "#radarMenuPanel #siteDock input",
+  "#radarMenuPanel #siteDock select",
+  "#radarMenuPanel #siteDock button",
+  ".bottom-panel.bottom-center .tool-grid button",
+  ".bottom-panel.bottom-center .tool-toggles input",
+  "#radarControlsSection input",
+];
 
 let uiScaleResizeRaf = null;
+let detachedControlChannel = null;
+let detachedControlWindow = null;
+
+function setDetachedControlsActive(active) {
+  document.body?.classList.toggle("detached-controls-active", Boolean(active));
+  const launchButton = document.getElementById("openDetachedControlsBtn");
+  launchButton?.classList.toggle("active", Boolean(active));
+}
 
 function clampNumber(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -393,6 +416,357 @@ function updateDockSummary() {
 
   setQuickTimelineProductButtons(selectedRadarProduct);
   updateQuickTimelineFrameLabel();
+}
+
+function isTdwrSite(site) {
+  return /^T/i.test(String(site?.id || "").trim());
+}
+
+function normalizeRadarProductForSite(productCode, site) {
+  const normalized = String(productCode || "")
+    .trim()
+    .toUpperCase();
+
+  if (!normalized) return normalized;
+
+  if (isTdwrSite(site)) {
+    if (normalized === "N0B") return "TZ0";
+    if (normalized === "N0G") return "TV0";
+    if (normalized === "N0C") return "";
+    return normalized;
+  }
+
+  if (normalized === "TZ0") return "N0B";
+  if (normalized === "TV0") return "N0G";
+  return normalized;
+}
+
+function getRadarApiSiteId(siteOrId) {
+  const raw =
+    typeof siteOrId === "string" ? siteOrId : String(siteOrId?.id || "").trim();
+
+  if (!raw) return raw;
+  return /^T/i.test(raw) ? raw.slice(1) : raw;
+}
+
+function updateRadarProductOptionsForSite(site) {
+  const productSelect = document.getElementById("radarProductSelect");
+  if (!productSelect) return;
+
+  const tdwr = isTdwrSite(site);
+  const options = Array.from(productSelect.options || []);
+
+  options.forEach((option) => {
+    if (!option.dataset.baseValue) option.dataset.baseValue = option.value;
+    if (!option.dataset.baseLabel)
+      option.dataset.baseLabel = option.textContent;
+
+    const baseValue = String(option.dataset.baseValue || "").toUpperCase();
+    const baseLabel = option.dataset.baseLabel || option.textContent;
+
+    option.value = baseValue;
+    option.textContent = baseLabel;
+    option.disabled = false;
+    option.hidden = false;
+
+    if (!tdwr) {
+      return;
+    }
+
+    if (baseValue === "N0B") {
+      option.value = "TZ0";
+      option.textContent = baseLabel.replace("(N0B)", "(TZ0)");
+      return;
+    }
+
+    if (baseValue === "N0G") {
+      option.value = "TV0";
+      option.textContent = baseLabel.replace("(N0G)", "(TV0)");
+      return;
+    }
+
+    if (/^N[0-3]C$/.test(baseValue)) {
+      option.disabled = true;
+      option.hidden = true;
+    }
+  });
+
+  const normalizedSelected = normalizeRadarProductForSite(
+    selectedRadarProduct || productSelect.value,
+    site,
+  );
+
+  const available = options
+    .filter((option) => !option.disabled && !option.hidden)
+    .map((option) => option.value);
+
+  const fallback = tdwr ? "TZ0" : "N0B";
+  const nextProduct = available.includes(normalizedSelected)
+    ? normalizedSelected
+    : available.includes(fallback)
+      ? fallback
+      : available[0] || normalizedSelected || fallback;
+
+  selectedRadarProduct = nextProduct;
+  productSelect.value = nextProduct;
+  setQuickTimelineProductButtons(nextProduct);
+}
+
+function getDetachedControlKey(element) {
+  if (!element || !(element instanceof Element)) return "";
+
+  if (element.id) {
+    return `id:${element.id}`;
+  }
+
+  if (element.matches("#radarQuickProducts button[data-product]")) {
+    return `quick-product:${String(element.dataset.product || "").toUpperCase()}`;
+  }
+
+  return "";
+}
+
+function findDetachedControlElementByKey(key) {
+  if (!key || typeof key !== "string") return null;
+
+  if (key.startsWith("id:")) {
+    return document.getElementById(key.slice(3));
+  }
+
+  if (key.startsWith("quick-product:")) {
+    const product = key.slice("quick-product:".length).toUpperCase();
+    return document.querySelector(
+      `#radarQuickProducts button[data-product="${product}"]`,
+    );
+  }
+
+  return null;
+}
+
+function getDetachedControlLabel(element) {
+  if (!element || !(element instanceof Element)) return "Control";
+
+  const byFor =
+    element.id &&
+    document.querySelector(`label[for="${element.id}"]`)?.textContent?.trim();
+  if (byFor) return byFor.replace(/\s+/g, " ");
+
+  const parentLabel = element.closest("label")?.textContent?.trim();
+  if (parentLabel) return parentLabel.replace(/\s+/g, " ");
+
+  if (element.matches("#radarQuickProducts button[data-product]")) {
+    return `Quick Product ${String(element.dataset.product || "").toUpperCase()}`;
+  }
+
+  const titleLike =
+    element.getAttribute("aria-label") ||
+    element.getAttribute("title") ||
+    element.textContent;
+  return (titleLike || "Control").trim().replace(/\s+/g, " ");
+}
+
+function collectDetachedControlElements() {
+  const unique = new Map();
+
+  DETACHED_CONTROL_TARGET_SELECTORS.forEach((selector) => {
+    document.querySelectorAll(selector).forEach((element) => {
+      if (!(element instanceof HTMLElement)) return;
+      if (
+        element.tagName === "INPUT" &&
+        String(element.type || "").toLowerCase() === "file"
+      ) {
+        return;
+      }
+
+      const key = getDetachedControlKey(element);
+      if (!key) return;
+      if (key === "id:openDetachedControlsBtn") return;
+
+      unique.set(key, element);
+    });
+  });
+
+  return Array.from(unique.entries()).map(([key, element]) => ({
+    key,
+    element,
+  }));
+}
+
+function buildDetachedControlSnapshot() {
+  const controls = [];
+  const state = {};
+
+  collectDetachedControlElements().forEach(({ key, element }) => {
+    const tagName = element.tagName.toLowerCase();
+    const inputType =
+      tagName === "input" ? String(element.type || "text").toLowerCase() : "";
+
+    let type = tagName;
+    if (tagName === "input") {
+      type = inputType;
+    }
+
+    const descriptor = {
+      key,
+      type,
+      label: getDetachedControlLabel(element),
+      disabled: Boolean(element.disabled),
+    };
+
+    if (tagName === "select") {
+      descriptor.options = Array.from(element.options || []).map((option) => ({
+        value: option.value,
+        label: option.textContent || option.value,
+      }));
+    }
+
+    if (tagName === "input" && ["range", "number"].includes(inputType)) {
+      descriptor.min = element.min;
+      descriptor.max = element.max;
+      descriptor.step = element.step;
+    }
+
+    controls.push(descriptor);
+
+    state[key] = {
+      disabled: Boolean(element.disabled),
+      hidden:
+        element.offsetParent === null &&
+        getComputedStyle(element).position !== "fixed",
+    };
+
+    if (tagName === "button") {
+      state[key].active =
+        element.classList.contains("is-active") ||
+        element.classList.contains("active") ||
+        element.getAttribute("aria-pressed") === "true";
+      state[key].html = element.innerHTML;
+      state[key].title = element.getAttribute("title") || "";
+    } else if (tagName === "input" && inputType === "checkbox") {
+      state[key].checked = Boolean(element.checked);
+    } else {
+      state[key].value = element.value;
+    }
+  });
+
+  return {
+    controls,
+    state,
+    timestamp: Date.now(),
+  };
+}
+
+function postDetachedControlsSnapshot(reason = "sync") {
+  if (!detachedControlChannel) return;
+  detachedControlChannel.postMessage({
+    type: "controls-snapshot",
+    reason,
+    payload: buildDetachedControlSnapshot(),
+  });
+}
+
+function applyDetachedControlAction(action) {
+  if (!action || typeof action !== "object") return;
+
+  const target = findDetachedControlElementByKey(String(action.key || ""));
+  if (!target || !(target instanceof HTMLElement)) return;
+
+  const actionType = String(action.action || "").toLowerCase();
+  const tagName = target.tagName.toLowerCase();
+
+  if (tagName === "button" || actionType === "click") {
+    target.click();
+    return;
+  }
+
+  if (tagName === "input" && String(target.type).toLowerCase() === "checkbox") {
+    target.checked = Boolean(action.checked);
+    target.dispatchEvent(new Event("change", { bubbles: true }));
+    return;
+  }
+
+  if (typeof action.value !== "undefined") {
+    target.value = String(action.value);
+    target.dispatchEvent(new Event("input", { bubbles: true }));
+    target.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+}
+
+function initializeDetachedControlBridge() {
+  if (!("BroadcastChannel" in window)) {
+    return;
+  }
+
+  detachedControlChannel = new BroadcastChannel(DETACHED_CONTROL_CHANNEL_NAME);
+  detachedControlChannel.onmessage = (event) => {
+    const message = event?.data;
+    if (!message || typeof message !== "object") return;
+
+    if (message.type === "request-snapshot" || message.type === "popup-ready") {
+      setDetachedControlsActive(true);
+      postDetachedControlsSnapshot("request");
+      return;
+    }
+
+    if (message.type === "control-action") {
+      applyDetachedControlAction(message.payload || {});
+      setTimeout(() => postDetachedControlsSnapshot("after-action"), 100);
+    }
+  };
+
+  const shouldSyncForEventTarget = (target) => {
+    if (!(target instanceof Element)) return false;
+    return Boolean(
+      target.closest(
+        "#radarQuickPanel, #radarMenuPanel #siteDock, .bottom-panel.bottom-center, #radarControlsSection",
+      ),
+    );
+  };
+
+  const forwardState = (event) => {
+    if (!shouldSyncForEventTarget(event?.target)) {
+      return;
+    }
+    postDetachedControlsSnapshot("live");
+  };
+
+  document.addEventListener("input", forwardState, true);
+  document.addEventListener("change", forwardState, true);
+  document.addEventListener("click", forwardState, true);
+
+  window.setInterval(() => {
+    if (detachedControlWindow && detachedControlWindow.closed) {
+      detachedControlWindow = null;
+      setDetachedControlsActive(false);
+    }
+    postDetachedControlsSnapshot("interval");
+  }, 1200);
+}
+
+function openDetachedControlsWindow() {
+  if (detachedControlWindow && !detachedControlWindow.closed) {
+    detachedControlWindow.focus();
+    setDetachedControlsActive(true);
+    postDetachedControlsSnapshot("focus-existing");
+    return;
+  }
+
+  detachedControlWindow = window.open(
+    DETACHED_CONTROL_POPUP_URL,
+    DETACHED_CONTROL_POPUP_NAME,
+    DETACHED_CONTROL_POPUP_FEATURES,
+  );
+
+  if (!detachedControlWindow) {
+    alert(
+      "Popup blocked. Allow popups for this app to open detached controls.",
+    );
+    setDetachedControlsActive(false);
+    return;
+  }
+
+  setDetachedControlsActive(true);
+  setTimeout(() => postDetachedControlsSnapshot("opened"), 250);
 }
 
 const LONG_PRESS_MS = 500;
@@ -907,7 +1281,10 @@ const PRECIP_TYPE_REFLECTIVITY_COLOR_EXPRESSION =
   buildPrecipTypeReflectivityExpression();
 
 function isRadarReflectivityProductCode(productCode) {
-  return typeof productCode === "string" && /^N[0-3]B$/.test(productCode);
+  return (
+    typeof productCode === "string" &&
+    (/^N[0-3]B$/.test(productCode) || /^TZ0$/.test(productCode))
+  );
 }
 
 function isHRRRReflectivityProductCode(productCode) {
@@ -921,59 +1298,85 @@ function isReflectivityProductCode(productCode) {
   );
 }
 
-const VELOCITY_COLOR_EXPRESSION = [
+const DEFAULT_CC_COLOR_EXPRESSION = [
   "interpolate",
   ["linear"],
   ["get", "dbz"],
-  -70,
-  "rgba(0, 100, 0, 0.9)",
-  -50,
-  "rgba(0, 150, 0, 0.9)",
-  -40,
-  "rgba(50, 200, 50, 0.9)",
-  -30,
-  "rgba(100, 220, 100, 0.9)",
-  -20,
-  "rgba(150, 240, 150, 0.9)",
-  -10,
-  "rgba(200, 255, 200, 0.9)",
-  -5,
-  "rgba(230, 255, 230, 0.9)",
-  -2,
-  "rgba(245, 255, 245, 0.9)",
   0,
-  "rgba(200, 200, 200, 0.5)",
-  2,
-  "rgba(255, 245, 245, 0.9)",
-  5,
-  "rgba(255, 230, 230, 0.9)",
+  "rgba(255, 255, 255, 1)",
+  15,
+  "rgba(153, 153, 153, 1)",
+  25,
+  "rgba(0, 0, 0, 1)",
+  35,
+  "rgba(38, 38, 38, 1)",
+  45,
+  "rgba(41, 61, 61, 1)",
+  55,
+  "rgba(0, 0, 102, 1)",
+  65,
+  "rgba(51, 102, 204, 1)",
+  75,
+  "rgba(0, 153, 0, 1)",
+  85,
+  "rgba(204, 153, 0, 1)",
+  95,
+  "rgba(128, 0, 0, 1)",
+  103,
+  "rgba(77, 0, 77, 1)",
+  104,
+  "rgba(240, 200, 240, 1)",
+  105,
+  "rgba(250, 250, 250, 0.5)",
+  200,
+  "rgba(50, 200, 200, 0.8)",
+];
+
+const DEFAULT_BV_COLOR_EXPRESSION = [
+  "interpolate",
+  ["linear"],
+  ["get", "dbz"],
+  -200,
+  "rgba(255, 220, 220, 1)",
+  -140,
+  "rgba(255, 20, 180, 1)",
+  -120,
+  "rgba(250, 4, 130, 1)",
+  -100,
+  "rgba(105, 2, 142, 1)",
+  -90,
+  "rgba(25, 1, 142, 1)",
+  -70,
+  "rgba(55, 226, 229, 1)",
+  -50,
+  "rgba(180, 240, 243, 1)",
+  -40,
+  "rgba(10, 248, 35, 1)",
+  -10,
+  "rgba(72, 112, 71, 1)",
+  0,
+  "rgba(130, 106, 120, 1)",
   10,
-  "rgba(255, 200, 200, 0.9)",
-  20,
-  "rgba(255, 150, 150, 0.9)",
-  30,
-  "rgba(255, 100, 100, 0.9)",
+  "rgba(105, 0, 0, 1)",
   40,
-  "rgba(255, 50, 50, 0.9)",
-  50,
-  "rgba(220, 0, 0, 0.9)",
+  "rgba(249, 58, 84, 1)",
+  55,
+  "rgba(255, 157, 206, 1)",
   60,
-  "rgba(180, 0, 0, 0.9)",
-  70,
-  "rgba(120, 0, 0, 0.9)",
+  "rgba(255, 230, 169, 1)",
+  80,
+  "rgba(254, 137, 80, 1)",
+  120,
+  "rgba(97, 6, 2, 1)",
+  140,
+  "rgba(60, 0, 0, 1)",
+  200,
+  "rgba(45, 0, 0, 1)",
   999,
   "rgba(123, 0, 200, 0.8)",
 ];
 
-/**
-  "rgba(97, 6, 2, 1.0)",
-  140,
-  "rgba(60, 0, 0, 1.0)",
-  200,
-  "rgba(45, 0, 0, 1.0)",
-  999, // Handling Range Folding (RF) values
-  "rgba(123, 0, 200, 0.8)",
-];
+const VELOCITY_COLOR_EXPRESSION = DEFAULT_BV_COLOR_EXPRESSION;
 
 /**
  * Parse a .pal (palette) file content
@@ -1015,8 +1418,17 @@ function parsePalFile(palText) {
           rfColor = { r, g, b };
         }
       }
-    } else if (lowerLine.startsWith("color:")) {
-      const parts = line.substring(6).trim().split(/\s+/);
+    } else if (
+      lowerLine.startsWith("color:") ||
+      lowerLine.startsWith("solidcolor:") ||
+      lowerLine.startsWith("solidcolor4:")
+    ) {
+      const colonIndex = line.indexOf(":");
+      if (colonIndex < 0) continue;
+      const parts = line
+        .substring(colonIndex + 1)
+        .trim()
+        .split(/\s+/);
       if (parts.length >= 4) {
         const value = parseFloat(parts[0]);
         const r = parseInt(parts[1]);
@@ -1024,7 +1436,21 @@ function parsePalFile(palText) {
         const b = parseInt(parts[3]);
 
         if (!isNaN(value) && !isNaN(r) && !isNaN(g) && !isNaN(b)) {
-          colors.push({ value, r, g, b });
+          let a = 0.9;
+          if (lowerLine.startsWith("solidcolor4:") && parts.length >= 5) {
+            const alphaRaw = parseFloat(parts[4]);
+            if (!isNaN(alphaRaw)) {
+              if (alphaRaw <= 1) {
+                a = alphaRaw;
+              } else if (alphaRaw <= 100) {
+                a = alphaRaw / 100;
+              } else {
+                a = alphaRaw / 255;
+              }
+            }
+          }
+
+          colors.push({ value, r, g, b, a: Math.max(0, Math.min(1, a)) });
         }
       }
     }
@@ -1033,7 +1459,13 @@ function parsePalFile(palText) {
   colors.sort((a, b) => a.value - b.value);
 
   if (rfColor) {
-    colors.push({ value: 999, r: rfColor.r, g: rfColor.g, b: rfColor.b });
+    colors.push({
+      value: 999,
+      r: rfColor.r,
+      g: rfColor.g,
+      b: rfColor.b,
+      a: 0.8,
+    });
   }
 
   console.log("Parsed palette:", {
@@ -1061,8 +1493,9 @@ function palToColorExpression(palette) {
   const scale = palette.scale || 1.0;
 
   for (const color of palette.colors) {
+    const alpha = Number.isFinite(color.a) ? color.a : 0.9;
     expression.push(color.value / scale);
-    expression.push(`rgba(${color.r}, ${color.g}, ${color.b}, 0.9)`);
+    expression.push(`rgba(${color.r}, ${color.g}, ${color.b}, ${alpha})`);
   }
 
   return expression;
@@ -1200,11 +1633,16 @@ function getRadarProductInfo(product) {
   }
 
   const tiltMatch = product.match(/^N([0-3])([A-Z])$/);
-  const tilt = tiltMatch ? parseInt(tiltMatch[1]) + 1 : 1;
-  const baseProduct = tiltMatch
-    ? tiltMatch[2]
-    : product.charAt(product.length - 1);
-  const tiltLabel = tilt > 1 ? ` (Tilt ${tilt})` : "";
+  const tdwrMatch = product.match(/^T([A-Z])0$/);
+  const tilt = tiltMatch ? parseInt(tiltMatch[1], 10) + 1 : 1;
+  const baseProduct = tdwrMatch
+    ? tdwrMatch[1] === "Z"
+      ? "B"
+      : tdwrMatch[1]
+    : tiltMatch
+      ? tiltMatch[2]
+      : product.charAt(product.length - 1);
+  const tiltLabel = tdwrMatch ? " (TDWR)" : tilt > 1 ? ` (Tilt ${tilt})` : "";
 
   const productMap = {
     B: {
@@ -1236,28 +1674,8 @@ function getRadarProductInfo(product) {
     },
     C: {
       name: `Correlation Coefficient${tiltLabel}`,
-      colorExpression: [
-        "interpolate",
-        ["linear"],
-        ["get", "dbz"],
-        0,
-        "#000000",
-        0.01,
-        "#4B0082",
-        0.3,
-        "#0000FF",
-        0.5,
-        "#00FF00",
-        0.7,
-        "#FFFF00",
-        0.85,
-        "#FF7F00",
-        0.95,
-        "#FF0000",
-        1.0,
-        "#FFFFFF",
-      ],
-      unit: "CC",
+      colorExpression: DEFAULT_CC_COLOR_EXPRESSION,
+      unit: "%",
       isVelocity: false,
     },
     X: {
@@ -2429,8 +2847,27 @@ function showAlertStyleMenu(anchorButton) {
   document.body.appendChild(menu);
 
   const anchorRect = anchorButton.getBoundingClientRect();
-  menu.style.top = `${Math.round(anchorRect.bottom + 8)}px`;
-  menu.style.right = `${Math.max(10, Math.round(window.innerWidth - anchorRect.right))}px`;
+  const margin = 10;
+  menu.style.visibility = "hidden";
+  menu.style.left = "0px";
+  menu.style.top = "0px";
+
+  const menuRect = menu.getBoundingClientRect();
+  let top = anchorRect.bottom + 8;
+  if (top + menuRect.height > window.innerHeight - margin) {
+    top = Math.max(margin, anchorRect.top - menuRect.height - 8);
+  }
+
+  let left = anchorRect.right - menuRect.width;
+  left = Math.max(
+    margin,
+    Math.min(left, window.innerWidth - menuRect.width - margin),
+  );
+
+  menu.style.top = `${Math.round(top)}px`;
+  menu.style.left = `${Math.round(left)}px`;
+  menu.style.right = "auto";
+  menu.style.visibility = "visible";
 
   menu.addEventListener("change", (event) => {
     const target = event.target;
@@ -2547,6 +2984,32 @@ function createAlertsToggleButton() {
     }
   }
 
+  let paletteUploadBtn = document.querySelector(".palette-upload-btn");
+  if (!paletteUploadBtn) {
+    paletteUploadBtn = document.createElement("button");
+    paletteUploadBtn.className = "inspector-toggle btn-icon palette-upload-btn";
+    paletteUploadBtn.type = "button";
+    paletteUploadBtn.title = "Upload palette for current product";
+    paletteUploadBtn.innerHTML =
+      '<span class="inspector-toggle-icon" aria-hidden="true"><i data-lucide="upload"></i></span>';
+
+    paletteUploadBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const input = document.getElementById("palFileInput");
+      if (input) {
+        input.click();
+      }
+    });
+
+    const toolGrid = document.querySelector(".bottom-center .tool-grid");
+    if (toolGrid) {
+      toolGrid.appendChild(paletteUploadBtn);
+      if (window.lucide && typeof window.lucide.createIcons === "function") {
+        window.lucide.createIcons();
+      }
+    }
+  }
+
   return button;
 }
 
@@ -2623,25 +3086,29 @@ style.textContent = `
 
   .alerts-dropdown-panel {
     position: absolute;
-    background: #ffffff;
-    border-radius: 8px;
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+    background: linear-gradient(165deg, rgba(9, 16, 26, 0.98), rgba(5, 10, 18, 0.98));
+    border-radius: 16px;
+    border: 1px solid rgba(120, 142, 176, 0.25);
+    box-shadow: 0 24px 60px rgba(2, 8, 20, 0.55), 0 0 0 1px rgba(255,255,255,0.04) inset;
     z-index: 1001;
-    width: 320px;
-    max-height: 430px;
+    width: min(390px, calc(100vw - 20px));
+    max-height: min(68vh, 560px);
     overflow: auto;
-    padding: 10px;
+    padding: 12px;
+    color: #e7edf7;
+    backdrop-filter: blur(16px) saturate(140%);
   }
 
   .alerts-dropdown-header {
-    border-bottom: 1px solid #e5e7eb;
-    padding-bottom: 10px;
-    margin-bottom: 10px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+    padding-bottom: 12px;
+    margin-bottom: 12px;
     font-weight: 700;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
+    color: #f8fbff;
   }
 
   .alerts-dropdown-header-actions {
@@ -2651,22 +3118,23 @@ style.textContent = `
   }
 
   .alerts-dropdown-header-actions button {
-    border: 1px solid #d1d5db;
-    border-radius: 6px;
-    background: #f8fafc;
-    color: #0f172a;
+    border: 1px solid rgba(120, 142, 176, 0.45);
+    border-radius: 999px;
+    background: rgba(20, 35, 58, 0.8);
+    color: #dbe7fa;
     font-size: 12px;
-    padding: 4px 8px;
+    padding: 5px 10px;
     cursor: pointer;
   }
 
   .dropdown-alert-item {
-    padding: 8px;
-    margin: 5px 0;
-    border-radius: 5px;
+    padding: 11px;
+    margin: 7px 0;
+    border-radius: 10px;
     cursor: pointer;
-    background-color: #f8f8f8;
-    transition: background-color 0.15s ease;
+    background: linear-gradient(150deg, rgba(22, 34, 53, 0.88), rgba(14, 26, 43, 0.9));
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    transition: background-color 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
   }
 
   .dropdown-alert-item-row {
@@ -2676,6 +3144,7 @@ style.textContent = `
 
   .dropdown-alert-item-icon {
     margin-right: 10px;
+    filter: drop-shadow(0 0 8px rgba(255,255,255,0.18));
   }
 
   .dropdown-alert-item-title {
@@ -2687,17 +3156,18 @@ style.textContent = `
 
   .dropdown-alert-item-subtitle {
     font-size: 0.8em;
-    color: #4b5563;
+    color: #9fb2cf;
   }
 
   .alert-muted-pill {
-    background: #e5e7eb;
-    color: #374151;
+    background: rgba(250, 204, 21, 0.18);
+    color: #fef08a;
     border-radius: 999px;
     font-size: 10px;
     padding: 2px 8px;
     text-transform: uppercase;
     letter-spacing: 0.04em;
+    border: 1px solid rgba(250, 204, 21, 0.35);
   }
 
   .alert-style-menu {
@@ -2857,7 +3327,9 @@ style.textContent = `
   }
 
   .dropdown-alert-item:hover {
-    background-color: #f0f0f0 !important;
+    background: linear-gradient(150deg, rgba(31, 49, 75, 0.95), rgba(20, 37, 60, 0.95)) !important;
+    border-color: rgba(125, 211, 252, 0.6);
+    transform: translateX(2px);
   }
 `;
 document.head.appendChild(style);
@@ -4534,7 +5006,8 @@ function detectTVS(data) {
   const velocityProduct =
     selectedRadarProduct === "N0G" ||
     selectedRadarProduct === "N1G" ||
-    selectedRadarProduct === "N0V";
+    selectedRadarProduct === "N0V" ||
+    selectedRadarProduct === "TV0";
 
   if (!velocityProduct) return [];
 
@@ -5529,6 +6002,13 @@ function formatEtaCountdown(hours) {
   return `${m}m`;
 }
 
+function removeStormMotionMarkers() {
+  stormTrackMarkers.forEach((marker) => marker.remove());
+  stormTrackMarkers = [];
+  stormTrackFirstMarker = null;
+  stormTrackSecondMarker = null;
+}
+
 function displayCityETAs(cities, maxHours, options = {}) {
   const existing = document.getElementById("city-eta-dialog");
   if (existing) existing.remove();
@@ -5598,7 +6078,7 @@ function displayCityETAs(cities, maxHours, options = {}) {
 
   html += `
       </div>
-      <button onclick="document.getElementById('city-eta-dialog').remove()" 
+      <button id="closeStormImpactForecast" 
         style="margin-top: 12px; width: 100%; padding: 8px; background: rgba(255,70,70,0.8); 
         border: none; border-radius: 6px; color: white; cursor: pointer; font-weight: bold;">
         Close
@@ -5608,6 +6088,14 @@ function displayCityETAs(cities, maxHours, options = {}) {
 
   dialog.innerHTML = html;
   document.body.appendChild(dialog);
+
+  const closeBtn = dialog.querySelector("#closeStormImpactForecast");
+  if (closeBtn) {
+    closeBtn.addEventListener("click", () => {
+      removeStormMotionMarkers();
+      dialog.remove();
+    });
+  }
 }
 
 function markCitiesOnMap(cities) {
@@ -8076,8 +8564,8 @@ async function fetchHistoricalWarnings(timestamp) {
 
     console.log(`🌩️ Fetching warnings ACTIVE at ${dateStr} ${timeStr}...`);
 
-    const torUrl = `https://radar-api-production-076b.up.railway.app/api/archive/warnings?date=${dateStr}&time=${timeStr}&pil=TOR`;
-    const svrUrl = `https://radar-api-production-076b.up.railway.app/api/archive/warnings?date=${dateStr}&time=${timeStr}&pil=SVR`;
+    const torUrl = `http://localhost:5100/api/archive/warnings?date=${dateStr}&time=${timeStr}&pil=TOR`;
+    const svrUrl = `http://localhost:5100/api/archive/warnings?date=${dateStr}&time=${timeStr}&pil=SVR`;
 
     console.log(`   Fetching TOR: ${torUrl}`);
     console.log(`   Fetching SVR: ${svrUrl}`);
@@ -8257,7 +8745,8 @@ function clearHistoricalAlerts() {
  */
 async function fetchArchiveTimestamps(siteId, product, date) {
   try {
-    const apiUrl = `https://radar-api-production-076b.up.railway.app/api/archive/timestamps/${siteId}?product=${product}&date=${date}`;
+    const apiSiteId = getRadarApiSiteId(siteId);
+    const apiUrl = `http://localhost:5100/api/archive/timestamps/${apiSiteId}?product=${product}&date=${date}`;
     console.log(`Fetching archive timestamps via backend: ${apiUrl}`);
 
     const response = await fetch(apiUrl);
@@ -8308,8 +8797,39 @@ function pruneQuickTimelineCache() {
 function setQuickTimelineProductButtons(product) {
   const productContainer = document.getElementById("radarQuickProducts");
   if (!productContainer) return;
+
+  const tdwr = isTdwrSite(selectedRadarSite);
   productContainer.querySelectorAll("button[data-product]").forEach((btn) => {
-    btn.classList.toggle("is-active", btn.dataset.product === product);
+    if (!btn.dataset.defaultTitle) {
+      btn.dataset.defaultTitle = btn.getAttribute("title") || "";
+    }
+
+    const rawCode = String(btn.dataset.product || "")
+      .trim()
+      .toUpperCase();
+    const mappedCode = normalizeRadarProductForSite(rawCode, selectedRadarSite);
+
+    if (rawCode === "N0C") {
+      const showCc = !tdwr;
+      btn.style.display = showCc ? "" : "none";
+      btn.disabled = !showCc;
+      btn.title = showCc ? "Correlation Coefficient" : "Unavailable for TDWR";
+      if (!showCc) {
+        btn.classList.remove("is-active");
+      }
+      return;
+    }
+
+    btn.style.display = "";
+    btn.disabled = false;
+    btn.classList.toggle("is-active", mappedCode === product);
+    btn.title = btn.dataset.defaultTitle || btn.title;
+
+    if (tdwr && rawCode === "N0B") {
+      btn.title = "Base Reflectivity (TZ0)";
+    } else if (tdwr && rawCode === "N0G") {
+      btn.title = "Base Velocity (TV0)";
+    }
   });
 }
 
@@ -8384,6 +8904,7 @@ async function fetchQuickTimelineBatch(
   const { maxWorkers = 6, progressiveDecode = false } = options;
   const decodedByKey = new Map();
   const transport = source === "level3" ? "radial" : "triangles";
+  const apiSiteId = getRadarApiSiteId(siteId);
 
   // If batch processing is disabled, skip directly to fallback single-fetch loop
   if (batchProcessingEnabled === false) {
@@ -8391,7 +8912,7 @@ async function fetchQuickTimelineBatch(
     const fallbackConcurrency = Math.max(1, Math.min(3, maxWorkers));
     await runConcurrentTaskPool(keys, fallbackConcurrency, async (key) => {
       const response = await fetch(
-        `https://radar-api-production-076b.up.railway.app/api/radar-webgl/${siteId}?product=${product}&source=${encodeURIComponent(source)}&format=binary&transport=${encodeURIComponent(transport)}&key=${encodeURIComponent(key)}`,
+        `http://localhost:5100/api/radar-webgl/${apiSiteId}?product=${product}&source=${encodeURIComponent(source)}&format=binary&transport=${encodeURIComponent(transport)}&key=${encodeURIComponent(key)}`,
         { cache: "force-cache" },
       );
       if (!response.ok) return;
@@ -8406,7 +8927,7 @@ async function fetchQuickTimelineBatch(
 
   try {
     const response = await fetch(
-      `https://radar-api-production-076b.up.railway.app/api/radar-webgl-batch/${siteId}`,
+      `http://localhost:5100/api/radar-webgl-batch/${apiSiteId}`,
       {
         method: "POST",
         headers: {
@@ -8463,7 +8984,7 @@ async function fetchQuickTimelineBatch(
     const fallbackConcurrency = Math.max(1, Math.min(3, maxWorkers));
     await runConcurrentTaskPool(keys, fallbackConcurrency, async (key) => {
       const response = await fetch(
-        `https://radar-api-production-076b.up.railway.app/api/radar-webgl/${siteId}?product=${product}&source=${encodeURIComponent(source)}&format=binary&transport=${encodeURIComponent(transport)}&key=${encodeURIComponent(key)}`,
+        `http://localhost:5100/api/radar-webgl/${apiSiteId}?product=${product}&source=${encodeURIComponent(source)}&format=binary&transport=${encodeURIComponent(transport)}&key=${encodeURIComponent(key)}`,
         { cache: "force-cache" },
       );
       if (!response.ok) return;
@@ -8674,11 +9195,19 @@ function scheduleQuickTimelineRender(index) {
     quickTimelinePendingIndex = -1;
     quickTimelineScrubRaf = null;
     if (!Number.isFinite(target) || target < 0) return;
-    renderQuickTimelineFrame(target, { activateTimeline: true }).catch(
-      (error) => {
+    const atLatest =
+      quickTimelineFrames.length > 0 &&
+      target >= quickTimelineFrames.length - 1;
+
+    renderQuickTimelineFrame(target, { activateTimeline: !atLatest })
+      .then(() => {
+        if (atLatest) {
+          resumeLiveRadarUpdates();
+        }
+      })
+      .catch((error) => {
         console.warn("Quick timeline render failed:", error);
-      },
-    );
+      });
   });
 }
 
@@ -8693,7 +9222,8 @@ async function loadArchiveRadarData(siteId, product, key, timestamp) {
   try {
     console.log(`Loading archive radar: ${key}`);
 
-    const apiUrl = `https://radar-api-production-076b.up.railway.app/api/radar-webgl/${siteId}?product=${product}&key=${key}&format=binary&transport=radial`;
+    const apiSiteId = getRadarApiSiteId(siteId);
+    const apiUrl = `http://localhost:5100/api/radar-webgl/${apiSiteId}?product=${product}&key=${key}&format=binary&transport=radial`;
     const response = await fetch(apiUrl);
 
     if (!response.ok) {
@@ -8747,6 +9277,26 @@ async function loadArchiveRadarData(siteId, product, key, timestamp) {
   }
 }
 
+async function fetchRadarSitesWithRetry(maxRetries = 3, delayMs = 3000) {
+  let sites = [];
+
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    sites = await fetchRadarSites();
+    if (Array.isArray(sites) && sites.length > 0) {
+      return sites;
+    }
+
+    if (attempt < maxRetries) {
+      console.warn(
+        `No radar sites detected; retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+
+  return Array.isArray(sites) ? sites : [];
+}
+
 window.onload = async () => {
   loadPalettesFromStorage();
   ensureAlertStyleConfig();
@@ -8758,6 +9308,17 @@ window.onload = async () => {
       const currentTheme =
         document.documentElement.getAttribute("data-theme") || "dark";
       applyTheme(currentTheme === "dark" ? "light" : "dark");
+    });
+  }
+
+  initializeDetachedControlBridge();
+  const openDetachedControlsBtn = document.getElementById(
+    "openDetachedControlsBtn",
+  );
+  if (openDetachedControlsBtn) {
+    openDetachedControlsBtn.addEventListener("click", (event) => {
+      event.preventDefault();
+      openDetachedControlsWindow();
     });
   }
 
@@ -8856,7 +9417,7 @@ window.onload = async () => {
   mapInstance.on("mousemove", handleMapPointerMove);
   mapInstance.on("touchmove", handleMapPointerMove);
 
-  const radarSites = await fetchRadarSites();
+  const radarSites = await fetchRadarSitesWithRetry(3, 3000);
   radarSitesCache = radarSites;
   populateRadarSitesDropdown(radarSites);
 
@@ -8879,7 +9440,10 @@ window.onload = async () => {
       const button = e.target.closest("button[data-product]");
       if (!button) return;
 
-      const nextProduct = String(button.dataset.product || "").toUpperCase();
+      const nextProduct = normalizeRadarProductForSite(
+        String(button.dataset.product || "").toUpperCase(),
+        selectedRadarSite,
+      );
       if (!nextProduct || !selectedRadarSite || dataMode !== "radar") return;
       if (nextProduct === selectedRadarProduct) return;
 
@@ -8890,7 +9454,8 @@ window.onload = async () => {
         `[LATENCY] Product changed to ${nextProduct} - starting background pre-fetch`,
       );
       const radarSource = selectedRadarDataSource || "level3";
-      const prefetchUrl = `https://radar-api-production-076b.up.railway.app/api/radar-webgl/${selectedRadarSite.id}?product=${nextProduct}&source=${encodeURIComponent(radarSource)}&format=binary`;
+      const prefetchSiteId = getRadarApiSiteId(selectedRadarSite);
+      const prefetchUrl = `http://localhost:5100/api/radar-webgl/${prefetchSiteId}?product=${nextProduct}&source=${encodeURIComponent(radarSource)}&format=binary`;
       fetch(prefetchUrl, { priority: "high" }).catch(() => {});
 
       selectedRadarProduct = nextProduct;
@@ -9206,6 +9771,7 @@ window.onload = async () => {
       const siteId = e.target.value;
       if (siteId) {
         selectedRadarSite = radarSites.find((site) => site.id === siteId);
+        updateRadarProductOptionsForSite(selectedRadarSite);
 
         radarSiteLocation = {
           longitude: selectedRadarSite.longitude,
@@ -9237,6 +9803,7 @@ window.onload = async () => {
         await refreshQuickTimeline(selectedRadarSite, selectedRadarProduct);
         updateDockSummary();
       } else {
+        updateRadarProductOptionsForSite(null);
         document.getElementById("radarControlsSection").style.display = "none";
         applyDataModeUI();
 
@@ -9263,7 +9830,15 @@ window.onload = async () => {
     .getElementById("radarProductSelect")
     .addEventListener("change", async (e) => {
       if (dataMode !== "radar") return;
-      const newProduct = e.target.value;
+      const newProduct = normalizeRadarProductForSite(
+        e.target.value,
+        selectedRadarSite,
+      );
+      if (!newProduct) {
+        e.target.value = selectedRadarProduct;
+        return;
+      }
+      e.target.value = newProduct;
       console.log(`Product changed to: ${newProduct}`);
 
       selectedRadarProduct = newProduct;
@@ -9533,7 +10108,8 @@ window.onload = async () => {
         framesToLoad,
         MAX_PARALLEL_DOWNLOADS,
         async (ts) => {
-          const apiUrl = `https://radar-api-production-076b.up.railway.app/api/radar-webgl/${selectedRadarSite.id}?product=${selectedRadarProduct}&key=${ts.key}&format=binary&transport=radial`;
+          const apiSiteId = getRadarApiSiteId(selectedRadarSite);
+          const apiUrl = `http://localhost:5100/api/radar-webgl/${apiSiteId}?product=${selectedRadarProduct}&key=${ts.key}&format=binary&transport=radial`;
           const response = await fetch(apiUrl, { cache: "force-cache" });
           if (!response.ok) {
             throw new Error(`Archive frame fetch failed (${response.status})`);
@@ -9637,21 +10213,9 @@ window.onload = async () => {
     toggleInspector();
   });
 
-  // TVS Detection Toggle
-  document
-    .getElementById("tvsDetectionToggle")
-    .addEventListener("change", (e) => {
-      tvsDetectionEnabled = e.target.checked;
-      if (!tvsDetectionEnabled) {
-        // Remove all TVS markers
-        detectedTVSMarkers.forEach((marker) => marker.remove());
-        detectedTVSMarkers = [];
-      } else if (currentRadarData) {
-        // Re-run detection on current data
-        const tvsLocations = detectTVS(currentRadarData);
-        displayTVSMarkers(tvsLocations);
-      }
-    });
+  tvsDetectionEnabled = false;
+  detectedTVSMarkers.forEach((marker) => marker.remove());
+  detectedTVSMarkers = [];
 
   // Storm Track Toggle
   document.getElementById("stormTrackToggle").addEventListener("click", () => {
@@ -11426,7 +11990,8 @@ function addRadarSitesToMap(map, sites) {
       const radarProduct = selectedRadarProduct || "N0B";
       const radarSource = selectedRadarDataSource || "level3";
 
-      const prefetchUrl = `https://radar-api-production-076b.up.railway.app/api/radar-webgl/${siteId}?product=${radarProduct}&source=${encodeURIComponent(radarSource)}&format=binary`;
+      const apiSiteId = getRadarApiSiteId(siteId);
+      const prefetchUrl = `http://localhost:5100/api/radar-webgl/${apiSiteId}?product=${radarProduct}&source=${encodeURIComponent(radarSource)}&format=binary`;
       fetch(prefetchUrl, { priority: "high" }).catch(() => {});
 
       document.getElementById("radarSiteSelect").value = siteId;
@@ -11445,7 +12010,8 @@ function addRadarSitesToMap(map, sites) {
       const radarProduct = selectedRadarProduct || "N0B";
       const radarSource = selectedRadarDataSource || "level3";
 
-      const prefetchUrl = `https://radar-api-production-076b.up.railway.app/api/radar-webgl/${siteId}?product=${radarProduct}&source=${encodeURIComponent(radarSource)}&format=binary`;
+      const apiSiteId = getRadarApiSiteId(siteId);
+      const prefetchUrl = `http://localhost:5100/api/radar-webgl/${apiSiteId}?product=${radarProduct}&source=${encodeURIComponent(radarSource)}&format=binary`;
       fetch(prefetchUrl, { priority: "high" }).catch(() => {});
 
       document.getElementById("radarSiteSelect").value = siteId;
@@ -11503,7 +12069,20 @@ function generateColorRampArray(colorExpression, textureSize = 256) {
     }
 
     const [r = 0, g = 0, b = 0, a = 1] = matches.map(Number);
-    const rgba = [Math.round(r), Math.round(g), Math.round(b), 255];
+    let alpha = Number(a);
+    if (!Number.isFinite(alpha)) alpha = 1;
+    if (alpha > 1 && alpha <= 100) {
+      alpha = alpha / 100;
+    } else if (alpha > 100) {
+      alpha = alpha / 255;
+    }
+    alpha = Math.max(0, Math.min(1, alpha));
+    const rgba = [
+      Math.round(r),
+      Math.round(g),
+      Math.round(b),
+      Math.round(alpha * 255),
+    ];
 
     stops.push({ value, color: rgba });
   }
@@ -11653,6 +12232,11 @@ const RadarWebGLLayer = {
           uniform float u_flash_opacity;
 
           void main() {
+              // Make NaN/Infinity samples transparent before palette lookup.
+              if (!(v_dbz > -1.0e20 && v_dbz < 1.0e20)) {
+                discard;
+              }
+
               float normalized_dbz = (v_dbz - u_dbz_range[0]) / (u_dbz_range[1] - u_dbz_range[0]);
               normalized_dbz = clamp(normalized_dbz, 0.0, 1.0);
 
@@ -11741,6 +12325,9 @@ const RadarWebGLLayer = {
           uniform sampler2D u_color_ramp;
           uniform vec2 u_dbz_range;
           void main() {
+            if (!(v_dbz > -1.0e20 && v_dbz < 1.0e20)) {
+              discard;
+            }
             float normalized_dbz = (v_dbz - u_dbz_range[0]) / (u_dbz_range[1] - u_dbz_range[0]);
             normalized_dbz = clamp(normalized_dbz, 0.0, 1.0);
             gl_FragColor = texture2D(u_color_ramp, vec2(normalized_dbz, 0.5));
@@ -12738,7 +13325,7 @@ async function fetchHRRRPTypeLookup(map) {
 
   const fetchLookupWithParams = async (queryParams) => {
     const response = await fetch(
-      `https://radar-api-production-076b.up.railway.app/api/hrrr-webgl?${queryParams.toString()}`,
+      `http://localhost:5100/api/hrrr-webgl?${queryParams.toString()}`,
     );
     if (!response.ok) {
       throw new Error(
@@ -12812,7 +13399,7 @@ async function fetchAvailableHRRRRuns() {
   }
 
   const response = await fetch(
-    `https://radar-api-production-076b.up.railway.app/api/hrrr-runs?${params.toString()}`,
+    `http://localhost:5100/api/hrrr-runs?${params.toString()}`,
   );
   if (!response.ok) {
     throw new Error(`Failed to load HRRR runs (${response.status})`);
@@ -13001,7 +13588,7 @@ async function fetchHRRRFrameForHour(map, forecastHour) {
   }
 
   const response = await fetch(
-    `https://radar-api-production-076b.up.railway.app/api/hrrr-webgl?${params.toString()}`,
+    `http://localhost:5100/api/hrrr-webgl?${params.toString()}`,
   );
   if (!response.ok) {
     throw new Error(
@@ -13143,7 +13730,7 @@ async function precacheModelRange(map) {
   }
 
   try {
-    const response = await fetch("https://radar-api-production-076b.up.railway.app/api/hrrr-precache", {
+    const response = await fetch("http://localhost:5100/api/hrrr-precache", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -13299,7 +13886,7 @@ async function fetchAndDisplayHRRRData(map, retryWithFallback = true) {
     }
 
     const response = await fetch(
-      `https://radar-api-production-076b.up.railway.app/api/hrrr-webgl?${params.toString()}`,
+      `http://localhost:5100/api/hrrr-webgl?${params.toString()}`,
     );
     if (!response.ok) {
       let backendError = "";
@@ -13464,7 +14051,10 @@ async function switchDataMode(nextMode) {
 
   const productSelect = document.getElementById("radarProductSelect");
   if (productSelect && productSelect.value) {
-    selectedRadarProduct = productSelect.value;
+    selectedRadarProduct = normalizeRadarProductForSite(
+      productSelect.value,
+      selectedRadarSite,
+    );
   }
   currentRenderProductCode = selectedRadarProduct;
   createColorScaleLegend(currentRenderProductCode);
@@ -13661,8 +14251,9 @@ function startArcSyncStream(map, site, product) {
   lastRenderedRadarToken = null;
 
   const radarProduct = product || selectedRadarProduct;
-  const streamUrl = `https://radar-api-production-076b.up.railway.app/api/radar/level2-stream?site=${encodeURIComponent(
-    site.id,
+  const apiSiteId = getRadarApiSiteId(site);
+  const streamUrl = `http://localhost:5100/api/radar/level2-stream?site=${encodeURIComponent(
+    apiSiteId,
   )}&product=${encodeURIComponent(radarProduct)}`;
 
   const eventSource = new EventSource(streamUrl);
@@ -13808,9 +14399,10 @@ async function pollForNewRadarData(map, site, product, source) {
   try {
     const radarProduct = product || selectedRadarProduct;
     const radarSource = source || selectedRadarDataSource;
+    const apiSiteId = getRadarApiSiteId(site);
 
     const keyResp = await fetch(
-      `https://radar-api-production-076b.up.railway.app/api/radar-latest-key/${site.id}?product=${radarProduct}&source=${encodeURIComponent(radarSource)}`,
+      `http://localhost:5100/api/radar-latest-key/${apiSiteId}?product=${radarProduct}&source=${encodeURIComponent(radarSource)}`,
     );
     if (!keyResp.ok) throw new Error("Failed to check latest radar key");
     const keyData = await keyResp.json();
@@ -13905,6 +14497,25 @@ function startRadarPolling(map, site, product, source) {
   }, pollInterval);
 }
 
+function resumeLiveRadarUpdates() {
+  if (
+    dataMode !== "radar" ||
+    isArchiveMode ||
+    !selectedRadarSite ||
+    !mapInstance
+  ) {
+    return;
+  }
+
+  quickTimelineActive = false;
+  startRadarPolling(
+    mapInstance,
+    selectedRadarSite,
+    selectedRadarProduct,
+    selectedRadarDataSource,
+  );
+}
+
 async function fetchAndDisplayRadarData(
   map,
   site,
@@ -13926,6 +14537,7 @@ async function fetchAndDisplayRadarData(
     const radarProduct = product || selectedRadarProduct;
     const radarSource = source || selectedRadarDataSource;
     currentRenderProductCode = radarProduct;
+    const apiSiteId = getRadarApiSiteId(site);
 
     console.time("FETCH-request");
     const revQuery = refreshToken
@@ -13933,7 +14545,7 @@ async function fetchAndDisplayRadarData(
       : "";
     const transportQuery = radarSource === "level3" ? "&transport=radial" : "";
     let response = await fetch(
-      `https://radar-api-production-076b.up.railway.app/api/radar-webgl/${site.id}?product=${radarProduct}&source=${encodeURIComponent(radarSource)}&format=binary${transportQuery}${revQuery}`,
+      `http://localhost:5100/api/radar-webgl/${apiSiteId}?product=${radarProduct}&source=${encodeURIComponent(radarSource)}&format=binary${transportQuery}${revQuery}`,
     );
 
     let radarData;
@@ -14254,8 +14866,8 @@ function getRadarMinimumRenderableValue(productCode) {
     .trim()
     .toUpperCase();
 
-  // Apply low-end filtering only for N0B, and use the true palette minimum.
-  if (normalized !== "N0B") {
+  // Apply low-end filtering only for base reflectivity products.
+  if (normalized !== "N0B" && normalized !== "TZ0") {
     return Number.NaN;
   }
 
@@ -14266,7 +14878,7 @@ function isVelocityProductCode(productCode) {
   const normalized = String(productCode || "")
     .trim()
     .toUpperCase();
-  return /N[0-3][GVS]$/.test(normalized);
+  return /N[0-3][GVS]$/.test(normalized) || normalized === "TV0";
 }
 
 function isCorrelationCoefficientProductCode(productCode) {
@@ -14517,17 +15129,11 @@ function updateRadarLayer(map, data) {
     // Store radar data for flash processing
     currentRadarData = data;
 
-    // TVS Detection
-    if (tvsDetectionEnabled && data.vertices && data.values) {
-      const tvsLocations = detectTVS(data);
-      displayTVSMarkers(tvsLocations);
-    }
-
     // Update high dBZ flash layer with actual high dBZ geometry
-    // Only show flash for Base Reflectivity product (N0B/N0G) which has dBZ data
+    // Only show flash for base reflectivity products.
     if (selectedRadarSite && map.getSource("radar-high-dbz-source")) {
       const isReflectivityProduct =
-        selectedRadarProduct === "N0B" || selectedRadarProduct === "N0G";
+        selectedRadarProduct === "N0B" || selectedRadarProduct === "TZ0";
       if (isReflectivityProduct && data.vertices && data.values) {
         const highDBZGeometry = extractHighDBZGeometry(
           data.vertices,
@@ -15258,9 +15864,10 @@ async function runConcurrentTaskPool(
 async function fetchAvailableRadarFiles(siteId, product, date = new Date()) {
   const radarProduct = product || selectedRadarProduct;
   const radarSource = selectedRadarDataSource || "level3";
+  const apiSiteId = getRadarApiSiteId(siteId);
 
   if (radarSource === "level2") {
-    const level2Url = `https://radar-api-production-076b.up.railway.app/api/radar-level2-files/${siteId}?limit=500`;
+    const level2Url = `http://localhost:5100/api/radar-level2-files/${apiSiteId}?limit=500`;
     console.time("fetch-file-list");
     console.log(`📡 Fetching Level 2 radar file list from: ${level2Url}`);
 
@@ -15338,10 +15945,11 @@ async function downloadSingleFrame(site, file, index, total, product) {
   try {
     const radarProduct = product || selectedRadarProduct;
     const radarSource = selectedRadarDataSource || "level3";
+    const apiSiteId = getRadarApiSiteId(site);
 
     const response = await fetch(
-      `https://radar-api-production-076b.up.railway.app/api/radar-webgl/${
-        site.id
+      `http://localhost:5100/api/radar-webgl/${
+        apiSiteId
       }?product=${radarProduct}&source=${encodeURIComponent(
         radarSource,
       )}&format=binary&key=${encodeURIComponent(file.key)}`,
@@ -15813,6 +16421,7 @@ function stopLoop() {
 
   // Pause behavior requirement: jump to the latest frame when playback stops.
   displayLatestLoopFrame();
+  resumeLiveRadarUpdates();
 }
 
 function setPlayPauseButtonState(isPlaying) {

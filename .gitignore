@@ -2,3 +2,7 @@
 node_modules/
 temp/*
 __pycache__/
+dist/
+build/
+bin/
+start.bat
