@@ -6,3 +6,4 @@ dist/
 build/
 bin/
 start.bat
+dist.zip

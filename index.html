@@ -24,23 +24,23 @@
     <style>
       :root {
         --ui-scale: 1;
-        --bg: #070a10;
-        --bg-soft: rgba(9, 12, 18, 0.92);
-        --surface: rgba(13, 16, 24, 0.94);
-        --surface-muted: rgba(16, 20, 30, 0.85);
-        --border: rgba(255, 255, 255, 0.08);
-        --border-strong: rgba(255, 255, 255, 0.16);
+        --bg: #07090f;
+        --bg-soft: rgba(9, 11, 17, 0.94);
+        --surface: rgba(11, 14, 21, 0.96);
+        --surface-muted: rgba(14, 17, 26, 0.88);
+        --border: rgba(255, 255, 255, 0.07);
+        --border-strong: rgba(255, 255, 255, 0.13);
         --card-shadow: none;
-        --text: #f7f9ff;
-        --muted: #b4bdd2;
-        --muted-strong: rgba(255, 255, 255, 0.82);
-        --disabled: rgba(255, 255, 255, 0.42);
-        --accent: #4fb8ff;
-        --accent-strong: #2f8eff;
-        --accent-soft: rgba(79, 184, 255, 0.1);
-        --glow-1: rgba(79, 184, 255, 0.18);
-        --glow-2: rgba(79, 106, 255, 0.12);
-        --card-radius-base: 18px;
+        --text: #e8ecf4;
+        --muted: #8b95a8;
+        --muted-strong: rgba(232, 236, 244, 0.78);
+        --disabled: rgba(255, 255, 255, 0.36);
+        --accent: #3b7dd8;
+        --accent-strong: #2563eb;
+        --accent-soft: rgba(59, 125, 216, 0.11);
+        --glow-1: transparent;
+        --glow-2: transparent;
+        --card-radius-base: 13px;
         --card-radius: calc(var(--card-radius-base) * var(--ui-scale));
         --sidebar-width-base: 660px;
         --sidebar-width: calc(var(--sidebar-width-base) * var(--ui-scale));
@@ -51,44 +51,44 @@
         --space-5: calc(28px * var(--ui-scale));
         --spacing: var(--space-5);
 
-        --radius-sm: calc(10px * var(--ui-scale));
-        --radius-md: calc(12px * var(--ui-scale));
-        --radius-lg: calc(14px * var(--ui-scale));
+        --radius-sm: calc(8px * var(--ui-scale));
+        --radius-md: calc(10px * var(--ui-scale));
+        --radius-lg: calc(12px * var(--ui-scale));
 
-        --control-height: calc(40px * var(--ui-scale));
-        --input-bg: rgba(7, 10, 16, 0.65);
-        --input-bg-hover: rgba(10, 14, 22, 0.75);
-        --input-border: rgba(255, 255, 255, 0.12);
-        --focus-ring: 0 0 0 3px rgba(79, 184, 255, 0.18);
-        --panel-blur: 12px;
+        --control-height: calc(38px * var(--ui-scale));
+        --input-bg: rgba(6, 8, 14, 0.7);
+        --input-bg-hover: rgba(9, 12, 20, 0.8);
+        --input-border: rgba(255, 255, 255, 0.10);
+        --focus-ring: 0 0 0 2px rgba(59, 125, 216, 0.28);
+        --panel-blur: 14px;
 
-        --fs-section-title: clamp(18px, calc(19px * var(--ui-scale)), 20px);
-        --fs-label: clamp(14px, calc(14.5px * var(--ui-scale)), 15px);
-        --fs-helper: clamp(12px, calc(12.5px * var(--ui-scale)), 13px);
-        --fs-button: clamp(14px, calc(14px * var(--ui-scale)), 15px);
-        --fs-kicker: clamp(12px, calc(12px * var(--ui-scale)), 12px);
+        --fs-section-title: clamp(15px, calc(16px * var(--ui-scale)), 17px);
+        --fs-label: clamp(13px, calc(13.5px * var(--ui-scale)), 14px);
+        --fs-helper: clamp(11px, calc(11.5px * var(--ui-scale)), 12px);
+        --fs-button: clamp(13px, calc(13px * var(--ui-scale)), 14px);
+        --fs-kicker: clamp(11px, calc(11px * var(--ui-scale)), 11px);
       }
 
       :root[data-theme="light"] {
-        --bg: #f3f6fc;
-        --bg-soft: rgba(248, 250, 255, 0.9);
-        --surface: rgba(255, 255, 255, 0.9);
-        --surface-muted: rgba(255, 255, 255, 0.7);
-        --border: rgba(15, 23, 42, 0.12);
-        --border-strong: rgba(15, 23, 42, 0.22);
-        --text: #0f172a;
-        --muted: #475569;
-        --muted-strong: rgba(15, 23, 42, 0.82);
-        --disabled: rgba(15, 23, 42, 0.5);
+        --bg: #f2f4f8;
+        --bg-soft: rgba(247, 249, 253, 0.92);
+        --surface: rgba(255, 255, 255, 0.94);
+        --surface-muted: rgba(248, 250, 255, 0.75);
+        --border: rgba(15, 23, 42, 0.10);
+        --border-strong: rgba(15, 23, 42, 0.18);
+        --text: #111827;
+        --muted: #4b5563;
+        --muted-strong: rgba(17, 24, 39, 0.78);
+        --disabled: rgba(15, 23, 42, 0.45);
         --accent: #2563eb;
         --accent-strong: #1d4ed8;
-        --accent-soft: rgba(37, 99, 235, 0.12);
-        --input-bg: rgba(245, 247, 252, 0.95);
-        --input-bg-hover: rgba(235, 242, 252, 0.98);
-        --input-border: rgba(15, 23, 42, 0.2);
-        --focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.2);
-        --glow-1: rgba(37, 99, 235, 0.18);
-        --glow-2: rgba(14, 116, 144, 0.12);
+        --accent-soft: rgba(37, 99, 235, 0.10);
+        --input-bg: rgba(244, 246, 251, 0.97);
+        --input-bg-hover: rgba(234, 240, 251, 0.99);
+        --input-border: rgba(15, 23, 42, 0.16);
+        --focus-ring: 0 0 0 2px rgba(37, 99, 235, 0.22);
+        --glow-1: transparent;
+        --glow-2: transparent;
       }
 
       * {
@@ -104,25 +104,11 @@
         padding: 0;
         font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
         color: var(--text);
-        background:
-          radial-gradient(circle at 15% 0%, var(--glow-1), transparent 50%),
-          radial-gradient(circle at 85% -5%, var(--glow-2), transparent 55%),
-          var(--bg);
+        background: var(--bg);
         min-height: 100vh;
-        line-height: 1.65;
+        line-height: 1.6;
         overflow: hidden;
         position: relative;
-      }
-
-      body::before {
-        content: "";
-        position: fixed;
-        inset: 0;
-        background-image:
-          radial-gradient(circle at 18% 18%, var(--glow-1), transparent 45%),
-          radial-gradient(circle at 75% -5%, var(--glow-2), transparent 55%);
-        pointer-events: none;
-        z-index: -1;
       }
 
       #map {
@@ -149,17 +135,17 @@
         position: fixed;
         background: var(--bg-soft);
         border: 1px solid var(--border);
-        border-radius: 18px;
-        padding: 12px;
+        border-radius: 13px;
+        padding: 11px;
         backdrop-filter: blur(var(--panel-blur));
-        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
         pointer-events: auto;
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: 7px;
         overflow-y: auto;
         overflow-x: hidden;
-        transition: all 0.3s ease;
+        transition: all 0.25s ease;
       }
 
       .bottom-panel.bottom-left {
@@ -238,10 +224,10 @@
 
       .dock-label {
         text-transform: uppercase;
-        letter-spacing: 0.2em;
-        font-size: 0.7rem;
+        letter-spacing: 0.12em;
+        font-size: 0.68rem;
         color: var(--muted);
-        margin: 0 0 4px;
+        margin: 0 0 3px;
       }
 
       .dock-title {
@@ -319,9 +305,10 @@
 
       .dock-section-header {
         text-transform: uppercase;
-        letter-spacing: 0.18em;
-        font-size: 0.7rem;
-        color: var(--muted-strong);
+        letter-spacing: 0.10em;
+        font-size: 0.68rem;
+        color: var(--muted);
+        font-weight: 600;
       }
 
       .dock-section.desktop-collapsible .dock-section-header {
@@ -421,9 +408,21 @@
       }
 
       .tool-grid .inspector-toggle {
+        width: 40px;
+        height: 40px;
         min-width: 40px;
-        padding: 10px;
+        padding: 0;
         flex-shrink: 0;
+      }
+
+      .tool-grid .inspector-toggle .inspector-toggle-icon {
+        width: 18px;
+        height: 18px;
+      }
+
+      .tool-grid .inspector-toggle .inspector-toggle-icon svg {
+        width: 18px;
+        height: 18px;
       }
 
       .tool-toggles {
@@ -434,21 +433,31 @@
 
       .tool-toggles .check-row {
         position: relative;
-        background: rgba(255, 255, 255, 0.04);
+        width: 40px;
+        height: 40px;
+        background: rgba(255, 255, 255, 0.05);
         border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: 8px 10px;
+        border-radius: 10px;
+        padding: 0;
         justify-content: center;
         gap: 0;
-        min-width: 44px;
+        min-width: 40px;
         flex-shrink: 0;
         cursor: pointer;
         transition: background-color 0.15s ease, border-color 0.15s ease;
+        display: inline-flex;
+        align-items: center;
       }
 
       .tool-toggles .check-row i {
-        color: var(--muted-strong);
+        color: var(--muted);
         transition: color 0.15s ease;
+        font-size: 15px;
+        line-height: 1;
+      }
+
+      .tool-toggles .check-row .fa-triangle-exclamation {
+        font-size: 14px;
       }
 
       .tool-toggles .check-row input[type="checkbox"] {
@@ -460,16 +469,16 @@
       }
 
       .tool-toggles .check-row.is-active {
-        background: #2563eb;
-        border-color: #60a5fa;
+        background: var(--accent);
+        border-color: rgba(59, 125, 216, 0.55);
       }
 
       .tool-toggles .check-row.is-active i {
-        color: #000;
+        color: #e8f0ff;
       }
 
       :root[data-theme="light"] .tool-toggles .check-row {
-        background: rgba(15, 23, 42, 0.04);
+        background: rgba(15, 23, 42, 0.05);
       }
 
       .sidebar {
@@ -701,11 +710,12 @@
       }
 
       .section-label {
-        letter-spacing: 0.22em;
+        letter-spacing: 0.10em;
         text-transform: uppercase;
         font-size: var(--fs-helper);
         color: var(--muted);
-        margin: 0 0 4px;
+        margin: 0 0 3px;
+        font-weight: 600;
       }
 
       .section-header h3 {
@@ -720,11 +730,11 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 34px;
-        height: 34px;
-        border-radius: 999px;
-        background: rgba(79, 184, 255, 0.1);
-        color: rgba(255, 255, 255, 0.92);
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--muted-strong);
       }
 
       .section-icon svg {
@@ -808,11 +818,11 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 32px;
-        height: 32px;
-        border-radius: 999px;
-        background: rgba(79, 184, 255, 0.14);
-        border: 1px solid rgba(79, 184, 255, 0.18);
+        width: 28px;
+        height: 28px;
+        border-radius: 7px;
+        background: rgba(59, 125, 216, 0.14);
+        border: 1px solid rgba(59, 125, 216, 0.18);
       }
 
       .brand-icon svg {
@@ -932,18 +942,10 @@
       select {
         appearance: none;
         cursor: pointer;
-        background-image:
-          linear-gradient(
-            135deg,
-            rgba(99, 211, 255, 0.15),
-            rgba(99, 211, 255, 0)
-          ),
-          url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%23FFFFFF' stroke-width='1.2' stroke-linecap='round'/%3E%3C/svg%3E");
+        background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%23AABBCC' stroke-width='1.2' stroke-linecap='round'/%3E%3C/svg%3E");
         background-repeat: no-repeat;
-        background-position:
-          right 14px center,
-          right 16px center;
-        padding-right: 46px;
+        background-position: right 14px center;
+        padding-right: 38px;
       }
 
       select::-ms-expand {
@@ -952,14 +954,14 @@
 
       select:focus,
       input[type="number"]:focus {
-        border-color: rgba(79, 184, 255, 0.55);
+        border-color: rgba(59, 125, 216, 0.5);
         box-shadow: var(--focus-ring);
         outline: none;
       }
 
       input[type="date"]:focus,
       input[type="file"]:focus {
-        border-color: rgba(79, 184, 255, 0.55);
+        border-color: rgba(59, 125, 216, 0.5);
         box-shadow: var(--focus-ring);
         outline: none;
       }
@@ -988,22 +990,22 @@
 
       input[type="range"]::-webkit-slider-thumb {
         appearance: none;
-        width: 24px;
-        height: 24px;
+        width: 18px;
+        height: 18px;
         border-radius: 50%;
         background: var(--accent);
-        border: 2px solid rgba(6, 9, 14, 0.9);
-        box-shadow: 0 4px 18px rgba(79, 184, 255, 0.25);
-        margin-top: -8px;
+        border: 2px solid rgba(6, 9, 14, 0.85);
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+        margin-top: -5px;
       }
 
       input[type="range"]::-moz-range-thumb {
-        width: 24px;
-        height: 24px;
+        width: 18px;
+        height: 18px;
         border-radius: 50%;
         background: var(--accent);
-        border: 2px solid rgba(6, 9, 14, 0.9);
-        box-shadow: 0 4px 18px rgba(79, 184, 255, 0.25);
+        border: 2px solid rgba(6, 9, 14, 0.85);
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
       }
 
       input[type="range"]:focus-visible {
@@ -1024,16 +1026,17 @@
         left: 16px;
         bottom: 16px;
         z-index: 1250;
-        width: min(360px, calc(100vw - 24px));
-        border-radius: 14px;
+        width: min(340px, calc(100vw - 24px));
+        border-radius: 11px;
         border: 1px solid var(--border);
-        background: rgba(8, 12, 19, 0.88);
-        backdrop-filter: blur(10px);
+        background: rgba(7, 9, 14, 0.92);
+        backdrop-filter: blur(14px);
         padding: 10px 12px;
         display: flex;
         flex-direction: column;
-        gap: 10px;
+        gap: 9px;
         pointer-events: auto;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
       }
 
       .radar-quick-panel__header {
@@ -1070,9 +1073,9 @@
       }
 
       .radar-product-toggle button.is-active {
-        background: linear-gradient(135deg, var(--accent), var(--accent-strong));
-        color: #04111f;
-        border-color: rgba(79, 184, 255, 0.65);
+        background: var(--accent);
+        color: #f0f4ff;
+        border-color: rgba(59, 125, 216, 0.55);
       }
 
       .radar-timeline-scrubber {
@@ -1124,22 +1127,18 @@
       }
 
       .btn-primary {
-        background: linear-gradient(
-          135deg,
-          var(--accent),
-          var(--accent-strong)
-        );
-        border-color: rgba(79, 184, 255, 0.55);
-        color: #07101f;
-        font-weight: 700;
-        padding: 12px 14px;
-        min-height: calc(46px * var(--ui-scale));
-        box-shadow: 0 14px 30px rgba(79, 184, 255, 0.18);
+        background: var(--accent);
+        border-color: rgba(59, 125, 216, 0.45);
+        color: #f0f4ff;
+        font-weight: 600;
+        padding: 11px 14px;
+        min-height: calc(42px * var(--ui-scale));
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
       }
 
       .btn-primary:hover {
-        background: linear-gradient(135deg, #73ccff, var(--accent-strong));
-        border-color: rgba(79, 184, 255, 0.75);
+        background: var(--accent-strong);
+        border-color: rgba(59, 125, 216, 0.65);
       }
 
       .btn-secondary {
@@ -1167,9 +1166,8 @@
       }
 
       .inspector-toggle.active {
-        background: rgba(79, 184, 255, 0.18);
-        border-color: rgba(79, 184, 255, 0.5);
-        box-shadow: 0 0 0 3px rgba(79, 184, 255, 0.12);
+        background: var(--accent-soft);
+        border-color: rgba(59, 125, 216, 0.45);
       }
 
       .inspector-toggle-icon {
@@ -1299,23 +1297,20 @@
 
       .radar-legend {
         position: fixed;
-        top: 5px;
+        top: 8px;
         left: 50%;
         transform: translateX(-50%);
         align-content: center;
-        width: min(360px, calc(100vw - 40px));
-        border-radius: 14px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        background: rgba(5, 8, 18, 0.88);
+        width: min(340px, calc(100vw - 40px));
+        border-radius: 11px;
+        border: 1px solid var(--border);
+        background: rgba(7, 9, 15, 0.92);
         padding: 10px 14px;
         color: var(--text);
-        box-shadow:
-          0 10px 24px rgba(0, 0, 0, 0.4),
-          0 0 20px rgba(99, 211, 255, 0.18);
-        backdrop-filter: blur(14px);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(16px);
         display: none;
         z-index: 1200;
-        animation: none;
       }
 
       .radar-info strong {
@@ -1392,17 +1387,7 @@
       }
 
       .legend-gradient__bar::after {
-        content: "";
-        position: absolute;
-        inset: -40% 0;
-        background: linear-gradient(
-          120deg,
-          rgba(255, 255, 255, 0),
-          rgba(255, 255, 255, 0.4),
-          rgba(255, 255, 255, 0)
-        );
-        animation: gradientSheen 6s linear infinite;
-        opacity: 0.25;
+        display: none;
       }
 
       .real-button-toggle {
@@ -1466,9 +1451,8 @@
       }
 
       .inspector-toggle.active {
-        background: rgba(99, 211, 255, 0.15);
-        border-color: rgba(99, 211, 255, 0.4);
-        box-shadow: none;
+        background: var(--accent-soft);
+        border-color: rgba(59, 125, 216, 0.4);
       }
 
       .button-group--tools {
@@ -1495,8 +1479,8 @@
       }
 
       .sidebar .inspector-toggle.active {
-        background: rgba(79, 184, 255, 0.18);
-        border-color: rgba(79, 184, 255, 0.5);
+        background: var(--accent-soft);
+        border-color: rgba(59, 125, 216, 0.45);
       }
 
       .sidebar .inspector-toggle-icon {
@@ -1519,15 +1503,13 @@
         position: fixed;
         z-index: 1250;
         display: none;
-        min-width: 220px;
-        padding: 16px 20px;
-        border-radius: 16px;
-        border: 1px solid rgba(99, 211, 255, 0.25);
-        background: rgba(5, 8, 18, 0.95);
-        backdrop-filter: blur(20px);
-        box-shadow:
-          0 16px 48px rgba(0, 0, 0, 0.5),
-          0 0 32px rgba(99, 211, 255, 0.2);
+        min-width: 200px;
+        padding: 14px 18px;
+        border-radius: 11px;
+        border: 1px solid var(--border-strong);
+        background: rgba(7, 9, 15, 0.96);
+        backdrop-filter: blur(18px);
+        box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
         pointer-events: none;
       }
 
@@ -1557,12 +1539,11 @@
       }
 
       .inspector-value {
-        font-size: 2rem;
+        font-size: 1.8rem;
         font-weight: 700;
         color: var(--text);
         line-height: 1;
         margin-bottom: 6px;
-        text-shadow: 0 0 20px rgba(99, 211, 255, 0.4);
       }
 
       .inspector-unit {
@@ -1633,7 +1614,7 @@
       .progress-bar {
         height: 100%;
         width: 0;
-        background: linear-gradient(90deg, var(--accent), #4f6bff);
+        background: var(--accent);
         transition: width 0.3s ease;
       }
 
@@ -1692,42 +1673,13 @@
         }
       }
 
-      @keyframes gradientSheen {
-        0% {
-          transform: translateX(-100%);
-        }
-        50% {
-          transform: translateX(0%);
-        }
-        100% {
-          transform: translateX(100%);
-        }
-      }
-
-      @keyframes legendGlow {
-        0% {
-          box-shadow:
-            0 20px 50px rgba(0, 0, 0, 0.1),
-            0 0 28px rgba(0, 0, 0, 0.05);
-        }
-        50% {
-          box-shadow:
-            0 26px 60px rgba(0, 0, 0, 0.15),
-            0 0 45px rgba(0, 0, 0, 0.1);
-        }
-        100% {
-          box-shadow:
-            0 20px 50px rgba(0, 0, 0, 0.1),
-            0 0 28px rgba(0, 0, 0, 0.05);
-        }
-      }
 
       ::-webkit-scrollbar {
-        width: 8px;
+        width: 5px;
       }
 
       ::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.09);
         border-radius: 999px;
       }
 
@@ -1754,30 +1706,28 @@
       }
 
       .probe-marker__label {
-        background: rgba(5, 8, 18, 0.95);
-        border: 1px solid rgba(99, 211, 255, 0.4);
-        border-radius: 8px;
-        padding: 2px 8px;
-        font-size: 0.7rem;
+        background: rgba(7, 9, 15, 0.95);
+        border: 1px solid var(--border-strong);
+        border-radius: 6px;
+        padding: 2px 7px;
+        font-size: 0.68rem;
         color: var(--text);
         white-space: nowrap;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
       }
 
       .probe-popup-container .maplibregl-popup-content {
-        background: rgba(5, 8, 18, 0.98);
-        border: 1px solid rgba(99, 211, 255, 0.3);
-        border-radius: 12px;
+        background: rgba(7, 9, 15, 0.97);
+        border: 1px solid var(--border-strong);
+        border-radius: 10px;
         padding: 0;
-        box-shadow:
-          0 12px 32px rgba(0, 0, 0, 0.6),
-          0 0 20px rgba(99, 211, 255, 0.2);
-        backdrop-filter: blur(20px);
-        min-width: 200px;
+        box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+        backdrop-filter: blur(18px);
+        min-width: 190px;
       }
 
       .probe-popup-container .maplibregl-popup-tip {
-        border-top-color: rgba(5, 8, 18, 0.98);
+        border-top-color: rgba(7, 9, 15, 0.97);
       }
 
       .probe-popup__header {
@@ -1789,11 +1739,11 @@
       }
 
       .probe-popup__title {
-        font-size: 0.85rem;
+        font-size: 0.78rem;
         font-weight: 600;
-        color: var(--accent);
+        color: var(--muted-strong);
         text-transform: uppercase;
-        letter-spacing: 0.1em;
+        letter-spacing: 0.08em;
       }
 
       .probe-popup__close {
@@ -1824,29 +1774,26 @@
       }
 
       .probe-popup__value {
-        font-size: 2rem;
+        font-size: 1.8rem;
         font-weight: 700;
         color: var(--text);
         line-height: 1;
         margin-bottom: 6px;
-        text-shadow: 0 0 20px rgba(99, 211, 255, 0.4);
       }
 
       /* Traffic Camera Popup Styles */
       .camera-popup-dark .maplibregl-popup-content {
-        background: rgba(13, 16, 24, 0.98) !important;
-        border: 1px solid rgba(79, 184, 255, 0.25);
-        border-radius: 14px;
+        background: rgba(9, 11, 17, 0.98) !important;
+        border: 1px solid var(--border-strong) !important;
+        border-radius: 11px;
         padding: 0 !important;
-        box-shadow:
-          0 16px 48px rgba(0, 0, 0, 0.65),
-          0 0 30px rgba(79, 184, 255, 0.15);
-        backdrop-filter: blur(24px);
-        color: #f7f9ff;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(20px);
+        color: var(--text);
       }
 
       .camera-popup-dark .maplibregl-popup-tip {
-        border-top-color: rgba(13, 16, 24, 0.98) !important;
+        border-top-color: rgba(9, 11, 17, 0.98) !important;
       }
 
       .camera-popup-dark .maplibregl-popup-close-button {
@@ -1926,8 +1873,8 @@
         left: 0;
         right: 0;
         bottom: 0;
-        background: rgba(0, 0, 0, 0.85);
-        backdrop-filter: blur(8px);
+        background: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(6px);
         z-index: 10000;
         align-items: center;
         justify-content: center;
@@ -1938,17 +1885,13 @@
       }
 
       .archive-content {
-        background: linear-gradient(
-          135deg,
-          rgba(20, 25, 35, 0.98),
-          rgba(30, 35, 50, 0.98)
-        );
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 16px;
-        padding: 32px;
-        max-width: 500px;
+        background: rgba(10, 13, 20, 0.98);
+        border: 1px solid var(--border-strong);
+        border-radius: 13px;
+        padding: 28px;
+        max-width: 480px;
         width: 90%;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        box-shadow: 0 8px 40px rgba(0, 0, 0, 0.55);
       }
 
       .archive-header {
@@ -1960,8 +1903,9 @@
 
       .archive-header h2 {
         margin: 0;
-        font-size: 1.5rem;
-        color: rgba(255, 255, 255, 0.95);
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: var(--text);
       }
 
       .archive-close {
@@ -2000,13 +1944,13 @@
       }
 
       .archive-info {
-        background: rgba(100, 150, 255, 0.1);
-        border-left: 3px solid rgba(100, 150, 255, 0.5);
-        padding: 12px;
-        margin-bottom: 20px;
+        background: var(--accent-soft);
+        border-left: 3px solid rgba(59, 125, 216, 0.5);
+        padding: 10px 12px;
+        margin-bottom: 18px;
         border-radius: 4px;
-        font-size: 0.85rem;
-        color: rgba(255, 255, 255, 0.7);
+        font-size: 0.82rem;
+        color: var(--muted-strong);
       }
 
       .archive-actions {
@@ -2042,12 +1986,12 @@
       }
 
       .timestamp-item:hover {
-        background: rgba(100, 150, 255, 0.15);
+        background: rgba(59, 125, 216, 0.12);
       }
 
       .timestamp-item.selected {
-        background: rgba(100, 150, 255, 0.3);
-        border-left: 3px solid rgba(100, 150, 255, 1);
+        background: var(--accent-soft);
+        border-left: 3px solid var(--accent);
       }
 
       .timestamp-time {
@@ -2068,14 +2012,14 @@
         position: absolute;
         right: 24px;
         top: 100px;
-        width: 280px;
+        width: 260px;
         padding: 14px;
-        border-radius: 14px;
-        background: rgba(10, 16, 24, 0.86);
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
-        backdrop-filter: blur(12px);
-        color: rgba(255, 255, 255, 0.92);
+        border-radius: 11px;
+        background: rgba(8, 10, 16, 0.94);
+        border: 1px solid var(--border-strong);
+        box-shadow: 0 6px 28px rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(14px);
+        color: var(--text);
         z-index: 10;
         display: none;
       }
@@ -2129,19 +2073,16 @@
       }
 
       .draw-panel__buttons button {
-        border-radius: 12px;
-        padding: 10px 12px;
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        background: rgba(255, 255,
+        border-radius: 9px;
+        padding: 9px 12px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.05);
         cursor: pointer;
-        transition:
-          transform 0.12s ease,
-          background 0.12s ease;
+        transition: background 0.12s ease;
       }
 
       .draw-panel__buttons button:hover {
-        background: rgba(100, 150, 255, 0.16);
-        transform: translateY(-1px);
+        background: rgba(59, 125, 216, 0.14);
       }
 
       .draw-panel__hint {
@@ -2334,7 +2275,7 @@
       }
 
       html[data-mobile="true"] .legend-gradient__bar::after {
-        opacity: 0.12;
+        display: none;
       }
     </style>
   </head>
@@ -2990,7 +2931,8 @@
               </summary>
               <div class="accordion__content">
                 <p class="help-text">
-                  Customize the live radar sweep animation appearance.
+                  GPU WebGL sweep overlay — crisp beam with optional continuous
+                  trail.
                 </p>
 
                 <div class="control-group">
@@ -2998,21 +2940,129 @@
                     <i class="fas fa-radar"></i> Mode
                   </label>
                   <select id="sweepMode">
-                    <option value="full">Full Trail (Default)</option>
+                    <option value="full">Full Trail</option>
+                    <option value="detailed">Detailed</option>
                     <option value="simple">Simple Line</option>
                     <option value="disabled">Disabled</option>
                   </select>
+                </div>
+
+                <div class="control-group">
+                  <label for="sweepQuality" title="Animation frame rate">
+                    <i class="fas fa-microchip"></i> Frame Rate
+                  </label>
+                  <select id="sweepQuality">
+                    <option value="low">Low (20 fps)</option>
+                    <option value="medium">Medium (30 fps)</option>
+                    <option value="high" selected>High (45 fps)</option>
+                  </select>
+                </div>
+
+                <div class="slider-container">
+                  <label for="sweepSpeed" title="Sweep Speed">
+                    <i class="fas fa-gauge-high"></i> Speed
+                  </label>
+                  <input
+                    type="range"
+                    id="sweepSpeed"
+                    min="5"
+                    max="180"
+                    step="5"
+                    value="90"
+                  />
+                  <span class="slider-value" id="sweepSpeedValue">90°/s</span>
+                </div>
+
+                <div class="slider-container" id="sweepTrailGroup">
+                  <label for="sweepTrail" title="Trail length in degrees">
+                    <i class="fas fa-ruler-horizontal"></i> Trail Length
+                  </label>
+                  <input
+                    type="range"
+                    id="sweepTrail"
+                    min="6"
+                    max="60"
+                    step="1"
+                    value="18"
+                  />
+                  <span class="slider-value" id="sweepTrailValue">18°</span>
+                </div>
+
+                <div class="slider-container">
+                  <label for="sweepBeamWidth" title="Beam line width">
+                    <i class="fas fa-minus"></i> Beam Width
+                  </label>
+                  <input
+                    type="range"
+                    id="sweepBeamWidth"
+                    min="1"
+                    max="12"
+                    step="1"
+                    value="2"
+                  />
+                  <span class="slider-value" id="sweepBeamWidthValue">2px</span>
+                </div>
+
+                <div class="slider-container">
+                  <label for="sweepOpacity" title="Overall sweep opacity">
+                    <i class="fas fa-circle-half-stroke"></i> Opacity
+                  </label>
+                  <input
+                    type="range"
+                    id="sweepOpacity"
+                    min="25"
+                    max="100"
+                    step="1"
+                    value="90"
+                  />
+                  <span class="slider-value" id="sweepOpacityValue">90%</span>
+                </div>
+
+                <div class="slider-container" id="sweepGlowGroup">
+                  <label for="sweepGlow" title="Glow intensity (detailed mode)">
+                    <i class="fas fa-sun"></i> Glow
+                  </label>
+                  <input
+                    type="range"
+                    id="sweepGlow"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value="45"
+                  />
+                  <span class="slider-value" id="sweepGlowValue">45%</span>
+                </div>
+
+                <div class="control-group">
+                  <label for="sweepColor" title="Sweep color">
+                    <i class="fas fa-palette"></i> Color
+                  </label>
+                  <input type="color" id="sweepColor" value="#e8f4ff" />
+                </div>
+
+                <div class="control-group" id="sweepRingsGroup">
+                  <label class="checkbox-label" for="sweepRangeRings">
+                    <input type="checkbox" id="sweepRangeRings" />
+                    Show range rings
+                  </label>
+                </div>
+
+                <div class="control-group">
+                  <label class="checkbox-label" for="sweepSyncLive">
+                    <input type="checkbox" id="sweepSyncLive" checked />
+                    Sync to live scan azimuth
+                  </label>
                 </div>
 
                 <p
                   class="help-text"
                   style="font-size: 0.85rem; margin-top: 8px"
                 >
-                  <strong>Full Trail:</strong> Animated gradient wedge with
-                  trailing effect.<br />
-                  <strong>Simple Line:</strong> Clean white line with distance
-                  fade and pulse.<br />
-                  <strong>Disabled:</strong> No sweep animation.
+                  <strong>Simple Line:</strong> Beam only.<br />
+                  <strong>Full Trail:</strong> Beam plus a short continuous
+                  trail directly behind it.<br />
+                  <strong>Detailed:</strong> Full trail with soft head glow and
+                  optional rings.
                 </p>
               </div>
             </details>
@@ -3271,12 +3321,12 @@
     <div class="archive-modal" id="archiveModal">
       <div class="archive-content">
         <div class="archive-header">
-          <h2>📅 Archive Radar Data</h2>
+          <h2>Archive Radar Data</h2>
           <button class="archive-close" id="archiveClose">×</button>
         </div>
 
         <div class="archive-info">
-          💡 Select a date to view available radar scans and historical warnings
+          Select a date to view available radar scans and historical warnings
           from the NEXRAD archive.
         </div>
 
@@ -3290,9 +3340,10 @@
             display: flex;
             align-items: center;
             gap: 10px;
-            margin: 16px 0;
-            padding: 12px;
-            background: rgba(255, 255, 255, 0.05);
+            margin: 14px 0;
+            padding: 10px 12px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border);
             border-radius: 8px;
           "
         >
@@ -3316,11 +3367,11 @@
             display: none;
             text-align: center;
             padding: 20px;
-            color: rgba(255, 255, 255, 0.7);
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.9rem;
           "
         >
-          <div style="font-size: 1.2rem">⏳</div>
-          <div>Loading available timestamps...</div>
+          Loading available timestamps...
         </div>
 
         <div id="timestampList" style="display: none; margin-bottom: 20px">
@@ -3337,32 +3388,20 @@
           <div
             id="timestampContainer"
             style="
-              max-height: 300px;
+              max-height: 280px;
               overflow-y: auto;
-              border: 1px solid rgba(255, 255, 255, 0.2);
+              border: 1px solid var(--border);
               border-radius: 8px;
-              background: rgba(0, 0, 0, 0.3);
+              background: rgba(0, 0, 0, 0.2);
             "
           ></div>
         </div>
 
         <div class="archive-actions">
-          <button
-            id="archiveClearBtn"
-            style="background: rgba(255, 100, 100, 0.2)"
-          >
+          <button id="archiveClearBtn" class="button-ghost">
             Clear Archive
           </button>
-          <button
-            id="archiveFetchBtn"
-            style="
-              background: linear-gradient(
-                135deg,
-                rgba(100, 150, 255, 0.3),
-                rgba(150, 100, 255, 0.3)
-              );
-            "
-          >
+          <button id="archiveFetchBtn" class="btn-primary">
             Find Scans
           </button>
         </div>
@@ -3379,5 +3418,12 @@
       });
     </script>
     <script src="app.js"></script>
+    <!--
+      Radar Legend "header" system (config store, renderer, on-canvas
+      toolbar, Legend Studio config panel) — modular ES modules, bridged to
+      app.js via window.RadarHeader. Module scripts are deferred, so this
+      always runs after app.js's top-level code has defined its globals.
+    -->
+    <script type="module" src="src/header/index.js"></script>
   </body>
 </html>
